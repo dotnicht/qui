@@ -39,7 +39,9 @@ jobs:
 
           tree = ET.parse(path)
           root = tree.getroot()
-          suite = root.find("testsuite") or root
+          suite = root.find("testsuite")
+          if suite is None:
+              suite = root
 
           total   = int(suite.get("tests",    0))
           failed  = int(suite.get("failures", 0)) + int(suite.get("errors", 0))
