@@ -1,6 +1,7 @@
 mod detail_popup;
 mod help_popup;
 mod layout;
+mod netvm_popup;
 mod qube_table;
 mod status_bar;
 
@@ -73,6 +74,13 @@ pub fn render(frame: &mut Frame, app: &mut App, ui: &mut UiState) {
                 frame.area(),
                 &format!("Force-kill '{vm_name}'? [y/N]"),
             );
+        }
+        Modal::ChangeNetvm {
+            ref vm_name,
+            ref candidates,
+            selected,
+        } => {
+            netvm_popup::render(frame, frame.area(), vm_name, candidates, selected);
         }
         Modal::None => {}
     }

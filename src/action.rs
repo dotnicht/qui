@@ -58,6 +58,7 @@ pub enum Action {
     PauseSelected,
     OpenTerminal,
     DeleteSelected,
+    ChangeNetvm,    // open netvm picker for selected VM
     EditProperty,   // open edit modal for the highlighted property row
     EditChar(char), // printable character typed into the edit input
     EditBackspace,  // delete last char in edit input

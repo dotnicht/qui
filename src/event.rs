@@ -39,6 +39,7 @@ fn translate_key(key: KeyEvent) -> Option<Action> {
         (Char('p'), _) => Some(Action::PauseSelected),
         (Char('t'), _) => Some(Action::OpenTerminal),
         (Char('d'), _) => Some(Action::DeleteSelected),
+        (Char('n'), _) => Some(Action::ChangeNetvm),
         (Char('e'), _) => Some(Action::EditProperty),
 
         // Confirmation dialogs

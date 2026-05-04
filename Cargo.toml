@@ -1,10 +1,10 @@
 [package]
-name    = "lazyqubes"
+name    = "qui"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "lazyqubes"
+name = "qui"
 path = "src/main.rs"
 
 [dependencies]

@@ -1,22 +1,34 @@
 #!/usr/bin/env bash
-# Copy this script to dom0 and run it.
-# It builds lazyqubes in your dev VM and installs it in dom0.
+# Install qui in dom0 by building it inside a dev VM.
+#
+# Copy this script to dom0 and run it — no local paths required.
+# Sources are cloned fresh from the repository.
 #
 # Usage:
-#   bash install-dom0.sh [dev-vm-name]
+#   bash install-dom0.sh [dev-vm] [repo-url] [install-path]
 #
-# Default dev VM: personal
+# Defaults:
+#   dev-vm        personal
+#   repo-url      https://github.com/dotnicht/qwe3
+#   install-path  ~/bin/qui
 set -euo pipefail
 
 DEV_VM="${1:-personal}"
-INSTALL="$HOME/bin/lazyqubes"
+REPO_URL="${2:-https://github.com/dotnicht/qwe3}"
+INSTALL="${3:-$HOME/bin/qui}"
 
-mkdir -p "$HOME/bin"
+echo "[*] Cloning and building in VM: $DEV_VM"
+mkdir -p "$(dirname "$INSTALL")"
 
-echo "[*] Building in $DEV_VM..."
-qvm-run --pass-io "$DEV_VM" \
-  'cd ~/src/qwe3 && git pull -q && cargo build --release -q && cat target/release/lazyqubes' \
-  > "$INSTALL"
+qvm-run --pass-io "$DEV_VM" "
+  set -euo pipefail
+  TMPDIR=\$(mktemp -d)
+  trap 'rm -rf \"\$TMPDIR\"' EXIT
+  git clone --depth 1 '$REPO_URL' \"\$TMPDIR/qui\"
+  cd \"\$TMPDIR/qui\"
+  cargo build --release --quiet
+  cat target/release/qui
+" > "$INSTALL"
 
 chmod +x "$INSTALL"
-echo "[+] Installed to $INSTALL"
+echo "[+] Installed: $INSTALL"

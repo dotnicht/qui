@@ -28,6 +28,11 @@ pub enum Modal {
     ConfirmKill {
         vm_name: String,
     },
+    ChangeNetvm {
+        vm_name: String,
+        candidates: Vec<String>, // "None" + names of network-providing VMs
+        selected: usize,
+    },
     EditProperty {
         vm_name: String,
         property: String,
@@ -188,6 +193,56 @@ impl App {
                                 input: current,
                             };
                         }
+                        vec![]
+                    }
+                    _ => vec![],
+                };
+            }
+            Modal::ChangeNetvm {
+                vm_name,
+                candidates,
+                selected,
+            } => {
+                let name = vm_name.clone();
+                let candidates = candidates.clone();
+                let mut selected = *selected;
+                return match action {
+                    Action::MoveUp => {
+                        if selected > 0 {
+                            selected -= 1;
+                        }
+                        self.modal = Modal::ChangeNetvm { vm_name: name, candidates, selected };
+                        vec![]
+                    }
+                    Action::MoveDown => {
+                        if selected + 1 < candidates.len() {
+                            selected += 1;
+                        }
+                        self.modal = Modal::ChangeNetvm { vm_name: name, candidates, selected };
+                        vec![]
+                    }
+                    Action::Confirm | Action::EditSubmit => {
+                        let value = candidates[selected].clone();
+                        self.modal = Modal::None;
+                        self.properties_cache.remove(&name);
+                        // Reflect immediately in the qube list
+                        if let Some(q) = self.qubes.iter_mut().find(|q| q.name == name) {
+                            q.netvm = if value == "None" { None } else { Some(value.clone()) };
+                        }
+                        vec![
+                            SideEffect::SetProperty {
+                                vm: name.clone(),
+                                property: "netvm".into(),
+                                value,
+                            },
+                            SideEffect::FetchProperties(name),
+                        ]
+                    }
+                    Action::Cancel | Action::Quit => {
+                        if matches!(action, Action::Quit) {
+                            self.should_quit = true;
+                        }
+                        self.modal = Modal::None;
                         vec![]
                     }
                     _ => vec![],
@@ -395,6 +450,34 @@ impl App {
                             level: MessageLevel::Warning,
                         });
                     }
+                }
+                vec![]
+            }
+            Action::ChangeNetvm => {
+                if let Some(q) = self.selected_qube() {
+                    let vm_name = q.name.clone();
+                    let current = q.netvm.clone();
+                    let mut candidates: Vec<String> = self
+                        .qubes
+                        .iter()
+                        .filter(|q| {
+                            q.state == QubeState::Running
+                                || self
+                                    .properties_cache
+                                    .get(&q.name)
+                                    .and_then(|p| p.provides_network)
+                                    .unwrap_or(false)
+                        })
+                        .filter(|q| q.name != vm_name)
+                        .map(|q| q.name.clone())
+                        .collect();
+                    candidates.sort();
+                    candidates.insert(0, "None".into());
+                    let selected = current
+                        .as_deref()
+                        .and_then(|c| candidates.iter().position(|n| n == c))
+                        .unwrap_or(0);
+                    self.modal = Modal::ChangeNetvm { vm_name, candidates, selected };
                 }
                 vec![]
             }

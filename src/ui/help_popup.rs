@@ -29,6 +29,7 @@ pub fn render(frame: &mut Frame, area: Rect) {
         binding("p", "Pause / unpause VM"),
         binding("t", "Open terminal in VM"),
         binding("d", "Delete VM (confirms first)"),
+        binding("n", "Change NetVM"),
         Line::raw(""),
         Line::styled("  Views", Style::default().add_modifier(Modifier::BOLD)),
         binding("1", "Qube Manager"),
