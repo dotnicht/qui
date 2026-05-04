@@ -1,7 +1,7 @@
-use std::io;
 use crossterm::{execute, terminal};
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
+use std::io;
 
 pub type Tui = Terminal<CrosstermBackend<io::Stderr>>;
 

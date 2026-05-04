@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use crate::admin::{AdminClient, QubeProperties};
-use crate::admin::types::{QubeClass, QubeInfo, QubeState};
 use crate::action::{Action, SideEffect};
+use crate::admin::types::{QubeClass, QubeInfo, QubeState};
+use crate::admin::{AdminClient, QubeProperties};
 use crate::app::{ActiveView, App};
+use std::sync::Arc;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -12,26 +12,37 @@ fn make_app() -> App {
 
 fn qube(name: &str, class: QubeClass, state: QubeState) -> QubeInfo {
     QubeInfo {
-        name:     name.into(),
+        name: name.into(),
         class,
         state,
-        label:    "red".into(),
+        label: "red".into(),
         template: Some("fedora-41".into()),
-        netvm:    Some("sys-firewall".into()),
+        netvm: Some("sys-firewall".into()),
     }
 }
 
-fn appvm(name: &str) -> QubeInfo { qube(name, QubeClass::AppVM, QubeState::Halted) }
-fn sysvm(name: &str) -> QubeInfo { qube(name, QubeClass::AppVM, QubeState::Running) }
-fn templatevm(name: &str) -> QubeInfo { qube(name, QubeClass::TemplateVM, QubeState::Halted) }
-fn adminvm(name: &str) -> QubeInfo { qube(name, QubeClass::AdminVM, QubeState::Running) }
+fn appvm(name: &str) -> QubeInfo {
+    qube(name, QubeClass::AppVM, QubeState::Halted)
+}
+fn sysvm(name: &str) -> QubeInfo {
+    qube(name, QubeClass::AppVM, QubeState::Running)
+}
+fn templatevm(name: &str) -> QubeInfo {
+    qube(name, QubeClass::TemplateVM, QubeState::Halted)
+}
+fn adminvm(name: &str) -> QubeInfo {
+    qube(name, QubeClass::AdminVM, QubeState::Running)
+}
 
 fn load(app: &mut App, qubes: Vec<QubeInfo>) {
     app.update(Action::QubeListLoaded(qubes));
 }
 
 fn names(app: &App) -> Vec<String> {
-    app.filtered_indices.iter().map(|&i| app.qubes[i].name.clone()).collect()
+    app.filtered_indices
+        .iter()
+        .map(|&i| app.qubes[i].name.clone())
+        .collect()
 }
 
 // ── Tab filter: Qubes ─────────────────────────────────────────────────────────
@@ -79,10 +90,17 @@ fn qubes_tab_excludes_whonix_name() {
 #[test]
 fn qubes_tab_includes_standalone_and_dispvm() {
     let mut app = make_app();
-    load(&mut app, vec![
-        qube("standalone-vault", QubeClass::StandaloneVM, QubeState::Halted),
-        qube("disp42",           QubeClass::DispVM,        QubeState::Running),
-    ]);
+    load(
+        &mut app,
+        vec![
+            qube(
+                "standalone-vault",
+                QubeClass::StandaloneVM,
+                QubeState::Halted,
+            ),
+            qube("disp42", QubeClass::DispVM, QubeState::Running),
+        ],
+    );
     let n = names(&app);
     assert!(n.contains(&"standalone-vault".to_string()));
     assert!(n.contains(&"disp42".to_string()));
@@ -93,7 +111,10 @@ fn qubes_tab_includes_standalone_and_dispvm() {
 #[test]
 fn services_tab_includes_sys_prefix() {
     let mut app = make_app();
-    load(&mut app, vec![sysvm("sys-net"), sysvm("sys-firewall"), sysvm("sys-usb")]);
+    load(
+        &mut app,
+        vec![sysvm("sys-net"), sysvm("sys-firewall"), sysvm("sys-usb")],
+    );
     app.update(Action::SwitchToServiceManager);
     let n = names(&app);
     assert!(n.contains(&"sys-net".to_string()));
@@ -133,11 +154,14 @@ fn sys_whonix_appears_in_services() {
 #[test]
 fn templates_tab_shows_only_templatevms() {
     let mut app = make_app();
-    load(&mut app, vec![
-        templatevm("fedora-41"),
-        templatevm("debian-12"),
-        appvm("personal"),
-    ]);
+    load(
+        &mut app,
+        vec![
+            templatevm("fedora-41"),
+            templatevm("debian-12"),
+            appvm("personal"),
+        ],
+    );
     app.update(Action::SwitchToTemplateManager);
     let n = names(&app);
     assert!(n.contains(&"fedora-41".to_string()));
@@ -150,12 +174,15 @@ fn templates_tab_shows_only_templatevms() {
 #[test]
 fn whonix_tab_matches_name_containing_whonix() {
     let mut app = make_app();
-    load(&mut app, vec![
-        appvm("anon-whonix"),
-        appvm("whonix-gw-17"),
-        sysvm("sys-whonix"),
-        appvm("personal"),
-    ]);
+    load(
+        &mut app,
+        vec![
+            appvm("anon-whonix"),
+            appvm("whonix-gw-17"),
+            sysvm("sys-whonix"),
+            appvm("personal"),
+        ],
+    );
     app.update(Action::SwitchToWhonixManager);
     let n = names(&app);
     assert!(n.contains(&"anon-whonix".to_string()));
@@ -191,7 +218,10 @@ fn switch_to_whonix_manager_sets_active_view() {
 #[test]
 fn switch_resets_selected_index_to_zero() {
     let mut app = make_app();
-    load(&mut app, vec![sysvm("sys-net"), sysvm("sys-firewall"), sysvm("sys-usb")]);
+    load(
+        &mut app,
+        vec![sysvm("sys-net"), sysvm("sys-firewall"), sysvm("sys-usb")],
+    );
     app.update(Action::SwitchToServiceManager);
     app.update(Action::MoveBottom); // index = 2
     app.update(Action::SwitchToQubeManager);
@@ -214,10 +244,15 @@ fn switch_to_empty_tab_does_not_panic() {
 #[test]
 fn switch_clamps_selection_when_new_tab_is_smaller() {
     let mut app = make_app();
-    load(&mut app, vec![
-        appvm("a"), appvm("b"), appvm("c"),  // 3 in Qubes
-        sysvm("sys-net"),                     // 1 in Services
-    ]);
+    load(
+        &mut app,
+        vec![
+            appvm("a"),
+            appvm("b"),
+            appvm("c"),       // 3 in Qubes
+            sysvm("sys-net"), // 1 in Services
+        ],
+    );
     app.update(Action::MoveBottom); // select index 2 in Qubes (3 items)
     app.update(Action::SwitchToServiceManager); // Services has 1 item
     assert_eq!(app.selected_index, 0);
@@ -228,15 +263,18 @@ fn switch_clamps_selection_when_new_tab_is_smaller() {
 #[test]
 fn all_four_tabs_partition_correctly() {
     let mut app = make_app();
-    load(&mut app, vec![
-        appvm("personal"),          // Qubes
-        appvm("work"),              // Qubes
-        sysvm("sys-net"),           // Services
-        adminvm("dom0"),            // Services
-        templatevm("fedora-41"),    // Templates
-        appvm("anon-whonix"),       // Whonix
-        sysvm("sys-whonix"),        // Services + Whonix
-    ]);
+    load(
+        &mut app,
+        vec![
+            appvm("personal"),       // Qubes
+            appvm("work"),           // Qubes
+            sysvm("sys-net"),        // Services
+            adminvm("dom0"),         // Services
+            templatevm("fedora-41"), // Templates
+            appvm("anon-whonix"),    // Whonix
+            sysvm("sys-whonix"),     // Services + Whonix
+        ],
+    );
 
     // Qubes: personal, work (sys-net, dom0, fedora-41, anon-whonix, sys-whonix excluded)
     assert_eq!(names(&app), vec!["personal", "work"]);
@@ -265,14 +303,19 @@ fn toggle_detail_fetches_properties_when_not_cached() {
     let mut app = make_app();
     load(&mut app, vec![appvm("personal")]);
     let effects = app.update(Action::ToggleDetail);
-    assert!(effects.iter().any(|e| matches!(e, SideEffect::FetchProperties(n) if n == "personal")));
+    assert!(effects
+        .iter()
+        .any(|e| matches!(e, SideEffect::FetchProperties(n) if n == "personal")));
 }
 
 #[test]
 fn toggle_detail_no_fetch_when_cached() {
     let mut app = make_app();
     load(&mut app, vec![appvm("personal")]);
-    app.properties_cache.insert("personal".into(), QubeProperties::default());
+    app.properties_cache
+        .insert("personal".into(), QubeProperties::default());
     let effects = app.update(Action::ToggleDetail);
-    assert!(!effects.iter().any(|e| matches!(e, SideEffect::FetchProperties(_))));
+    assert!(!effects
+        .iter()
+        .any(|e| matches!(e, SideEffect::FetchProperties(_))));
 }

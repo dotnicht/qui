@@ -9,10 +9,7 @@ pub enum AdminError {
     Protocol(String),
 
     #[error("qubesd exception ({exc_type}): {message}")]
-    QubesDException {
-        exc_type: String,
-        message:  String,
-    },
+    QubesDException { exc_type: String, message: String },
 
     #[error("connection lost")]
     ConnectionLost,

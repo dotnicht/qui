@@ -23,7 +23,11 @@ pub enum SideEffect {
     PauseVm(String),
     DeleteVm(String),
     OpenTerminal(String),
-    SetProperty { vm: String, property: String, value: String },
+    SetProperty {
+        vm: String,
+        property: String,
+        value: String,
+    },
 }
 
 /// All actions that can be dispatched — from keyboard input or background threads.
@@ -54,16 +58,16 @@ pub enum Action {
     PauseSelected,
     OpenTerminal,
     DeleteSelected,
-    EditProperty,           // open edit modal for the highlighted property row
-    EditChar(char),         // printable character typed into the edit input
-    EditBackspace,          // delete last char in edit input
-    EditSubmit,             // confirm the edit (Enter)
+    EditProperty,   // open edit modal for the highlighted property row
+    EditChar(char), // printable character typed into the edit input
+    EditBackspace,  // delete last char in edit input
+    EditSubmit,     // confirm the edit (Enter)
 
     // Async results from background threads
     QubeListLoaded(Vec<QubeInfo>),
     PropertiesLoaded { name: String, props: QubeProperties },
     OperationCompleted { op_id: u64 },
-    OperationFailed    { op_id: u64, error: String },
+    OperationFailed { op_id: u64, error: String },
     EventReceived(AdminEvent),
     Tick,
 }

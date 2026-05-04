@@ -1,11 +1,11 @@
-mod layout;
-mod qube_table;
 mod detail_popup;
 mod help_popup;
+mod layout;
+mod qube_table;
 mod status_bar;
 
-use ratatui::Frame;
 use ratatui::widgets::TableState;
+use ratatui::Frame;
 
 use crate::app::{App, Modal};
 
@@ -15,7 +15,9 @@ pub struct UiState {
 
 impl UiState {
     pub fn new() -> Self {
-        Self { table_state: TableState::default() }
+        Self {
+            table_state: TableState::default(),
+        }
     }
 }
 
@@ -23,10 +25,11 @@ pub fn render(frame: &mut Frame, app: &mut App, ui: &mut UiState) {
     let areas = layout::compute(frame.area());
 
     // Sync table selection
-    ui.table_state.select(
-        if app.filtered_indices.is_empty() { None }
-        else { Some(app.selected_index) }
-    );
+    ui.table_state.select(if app.filtered_indices.is_empty() {
+        None
+    } else {
+        Some(app.selected_index)
+    });
 
     // Tab bar
     status_bar::render_tabs(frame, areas.tab_bar, app);
@@ -45,7 +48,11 @@ pub fn render(frame: &mut Frame, app: &mut App, ui: &mut UiState) {
                 detail_popup::render(frame, frame.area(), &qube, app);
             }
         }
-        Modal::EditProperty { ref vm_name, ref property, ref input } => {
+        Modal::EditProperty {
+            ref vm_name,
+            ref property,
+            ref input,
+        } => {
             // Render the detail popup underneath first (re-use detail render)
             if let Some(qube) = app.selected_qube().cloned() {
                 detail_popup::render(frame, frame.area(), &qube, app);
@@ -54,12 +61,18 @@ pub fn render(frame: &mut Frame, app: &mut App, ui: &mut UiState) {
             detail_popup::render_edit(frame, frame.area(), vm_name, property, input);
         }
         Modal::ConfirmDelete { ref vm_name } => {
-            help_popup::render_confirm(frame, frame.area(),
-                &format!("Delete '{vm_name}'? This cannot be undone. [y/N]"));
+            help_popup::render_confirm(
+                frame,
+                frame.area(),
+                &format!("Delete '{vm_name}'? This cannot be undone. [y/N]"),
+            );
         }
         Modal::ConfirmKill { ref vm_name } => {
-            help_popup::render_confirm(frame, frame.area(),
-                &format!("Force-kill '{vm_name}'? [y/N]"));
+            help_popup::render_confirm(
+                frame,
+                frame.area(),
+                &format!("Force-kill '{vm_name}'? [y/N]"),
+            );
         }
         Modal::None => {}
     }

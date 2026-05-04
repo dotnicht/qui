@@ -1,5 +1,5 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crate::action::Action;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 pub fn translate(event: Event) -> Option<Action> {
     match event {
@@ -14,17 +14,17 @@ fn translate_key(key: KeyEvent) -> Option<Action> {
 
     match (key.code, key.modifiers) {
         (Char('q'), Mods::NONE) | (Char('c'), Mods::CONTROL) => Some(Action::Quit),
-        (Char('?'), _)  => Some(Action::ShowHelp),
-        (Esc, _)        => Some(Action::Cancel),
+        (Char('?'), _) => Some(Action::ShowHelp),
+        (Esc, _) => Some(Action::Cancel),
         // Enter: EditSubmit when in edit modal; ToggleDetail otherwise.
         // App::update() disambiguates based on modal state.
-        (Enter, _)      => Some(Action::EditSubmit),
+        (Enter, _) => Some(Action::EditSubmit),
 
         // Navigation (vim + arrows)
-        (Char('j'), _) | (Down, _)  => Some(Action::MoveDown),
-        (Char('k'), _) | (Up, _)    => Some(Action::MoveUp),
-        (Char('g'), _) | (Home, _)  => Some(Action::MoveTop),
-        (Char('G'), _) | (End, _)   => Some(Action::MoveBottom),
+        (Char('j'), _) | (Down, _) => Some(Action::MoveDown),
+        (Char('k'), _) | (Up, _) => Some(Action::MoveUp),
+        (Char('g'), _) | (Home, _) => Some(Action::MoveTop),
+        (Char('G'), _) | (End, _) => Some(Action::MoveBottom),
 
         // Tab switching
         (Char('1'), _) => Some(Action::SwitchToQubeManager),
@@ -34,19 +34,19 @@ fn translate_key(key: KeyEvent) -> Option<Action> {
 
         // VM operations (only meaningful when no modal is open)
         (Char('s'), Mods::NONE) => Some(Action::StartSelected),
-        (Char('S'), _)          => Some(Action::ShutdownSelected),
-        (Char('K'), _)          => Some(Action::KillSelected),
-        (Char('p'), _)          => Some(Action::PauseSelected),
-        (Char('t'), _)          => Some(Action::OpenTerminal),
-        (Char('d'), _)          => Some(Action::DeleteSelected),
-        (Char('e'), _)          => Some(Action::EditProperty),
+        (Char('S'), _) => Some(Action::ShutdownSelected),
+        (Char('K'), _) => Some(Action::KillSelected),
+        (Char('p'), _) => Some(Action::PauseSelected),
+        (Char('t'), _) => Some(Action::OpenTerminal),
+        (Char('d'), _) => Some(Action::DeleteSelected),
+        (Char('e'), _) => Some(Action::EditProperty),
 
         // Confirmation dialogs
-        (Char('y'), _)    => Some(Action::Confirm),
+        (Char('y'), _) => Some(Action::Confirm),
 
         // Edit input
-        (Backspace, _)    => Some(Action::EditBackspace),
-        (Char(c), _)      => Some(Action::EditChar(c)),
+        (Backspace, _) => Some(Action::EditBackspace),
+        (Char(c), _) => Some(Action::EditChar(c)),
 
         _ => None,
     }

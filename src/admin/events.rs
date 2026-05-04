@@ -1,10 +1,7 @@
-use std::collections::HashMap;
-
 #[derive(Debug, Clone)]
 pub struct AdminEvent {
-    pub subject:    String,
+    pub subject: String,
     pub event_type: String,
-    pub properties: HashMap<String, String>,
 }
 
 // Placeholder — full implementation in Phase 3.

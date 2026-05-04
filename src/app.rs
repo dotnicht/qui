@@ -9,6 +9,7 @@ use crate::admin::{AdminClient, QubeClass, QubeInfo, QubeProperties, QubeState};
 use crate::action::{Action, OpKind, SideEffect};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
 pub enum ActiveView {
     QubeManager,
     ServiceManager,
@@ -21,65 +22,78 @@ pub enum Modal {
     None,
     Help,
     Detail,
-    ConfirmDelete { vm_name: String },
-    ConfirmKill   { vm_name: String },
-    EditProperty  { vm_name: String, property: String, input: String },
+    ConfirmDelete {
+        vm_name: String,
+    },
+    ConfirmKill {
+        vm_name: String,
+    },
+    EditProperty {
+        vm_name: String,
+        property: String,
+        input: String,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub struct PendingOp {
-    pub op_id:   u64,
+    pub op_id: u64,
     pub vm_name: String,
-    pub kind:    OpKind,
+    pub kind: OpKind,
     pub started: Instant,
 }
 
 #[derive(Debug, Clone)]
-pub enum MessageLevel { Info, Success, Warning, Error }
+pub enum MessageLevel {
+    Info,
+    Success,
+    Warning,
+    Error,
+}
 
 #[derive(Debug, Clone)]
 pub struct StatusMessage {
-    pub text:  String,
+    pub text: String,
     pub level: MessageLevel,
 }
 
 pub struct App {
-    pub client:           Arc<AdminClient>,
-    pub active_view:      ActiveView,
-    pub qubes:            Vec<QubeInfo>,
+    pub client: Arc<AdminClient>,
+    pub active_view: ActiveView,
+    pub qubes: Vec<QubeInfo>,
     pub filtered_indices: Vec<usize>,
-    pub selected_index:   usize,
-    pub modal:            Modal,
-    pub detail_scroll:    u16,
+    pub selected_index: usize,
+    pub modal: Modal,
+    pub detail_scroll: u16,
     /// Which row in the detail popup is highlighted (for editing).
-    pub detail_row:       usize,
+    pub detail_row: usize,
     /// Ordered list of (property_key, display_label) rows shown in the detail popup.
     /// Rebuilt by the UI layer and stored here so App::update() can look up by index.
-    pub detail_rows:      Vec<(String, String)>,
+    pub detail_rows: Vec<(String, String)>,
     pub properties_cache: HashMap<String, QubeProperties>,
-    pub pending_ops:      Vec<PendingOp>,
-    pub next_op_id:       u64,
-    pub status:           Option<StatusMessage>,
-    pub should_quit:      bool,
+    pub pending_ops: Vec<PendingOp>,
+    pub next_op_id: u64,
+    pub status: Option<StatusMessage>,
+    pub should_quit: bool,
 }
 
 impl App {
     pub fn new(client: Arc<AdminClient>) -> Self {
         Self {
             client,
-            active_view:      ActiveView::QubeManager,
-            qubes:            Vec::new(),
+            active_view: ActiveView::QubeManager,
+            qubes: Vec::new(),
             filtered_indices: Vec::new(),
-            selected_index:   0,
-            modal:            Modal::None,
-            detail_scroll:    0,
-            detail_row:       0,
-            detail_rows:      Vec::new(),
+            selected_index: 0,
+            modal: Modal::None,
+            detail_scroll: 0,
+            detail_row: 0,
+            detail_rows: Vec::new(),
             properties_cache: HashMap::new(),
-            pending_ops:      Vec::new(),
-            next_op_id:       0,
-            status:           None,
-            should_quit:      false,
+            pending_ops: Vec::new(),
+            next_op_id: 0,
+            status: None,
+            should_quit: false,
         }
     }
 
@@ -120,7 +134,9 @@ impl App {
             Modal::Help => {
                 return match action {
                     Action::Cancel | Action::HideHelp | Action::ShowHelp | Action::Quit => {
-                        if matches!(action, Action::Quit) { self.should_quit = true; }
+                        if matches!(action, Action::Quit) {
+                            self.should_quit = true;
+                        }
                         self.modal = Modal::None;
                         vec![]
                     }
@@ -130,12 +146,16 @@ impl App {
             Modal::Detail => {
                 return match action {
                     Action::Cancel | Action::ToggleDetail | Action::Quit => {
-                        if matches!(action, Action::Quit) { self.should_quit = true; }
+                        if matches!(action, Action::Quit) {
+                            self.should_quit = true;
+                        }
                         self.modal = Modal::None;
                         vec![]
                     }
                     Action::MoveUp => {
-                        if self.detail_row > 0 { self.detail_row -= 1; }
+                        if self.detail_row > 0 {
+                            self.detail_row -= 1;
+                        }
                         // Scroll up if needed
                         if (self.detail_row as u16) < self.detail_scroll {
                             self.detail_scroll = self.detail_row as u16;
@@ -150,36 +170,54 @@ impl App {
                     }
                     Action::EditProperty => {
                         if let Some((key, _label)) = self.detail_rows.get(self.detail_row) {
-                            let vm_name = self.selected_qube()
+                            let vm_name = self
+                                .selected_qube()
                                 .map(|q| q.name.clone())
                                 .unwrap_or_default();
                             // Pre-fill current value from cache
-                            let current = self.properties_cache
+                            let current = self
+                                .properties_cache
                                 .get(&vm_name)
                                 .and_then(|p| p.raw.get(key))
                                 .cloned()
                                 .unwrap_or_default();
                             let property = key.clone();
-                            self.modal = Modal::EditProperty { vm_name, property, input: current };
+                            self.modal = Modal::EditProperty {
+                                vm_name,
+                                property,
+                                input: current,
+                            };
                         }
                         vec![]
                     }
                     _ => vec![],
                 };
             }
-            Modal::EditProperty { vm_name, property, input } => {
-                let vm_name  = vm_name.clone();
+            Modal::EditProperty {
+                vm_name,
+                property,
+                input,
+            } => {
+                let vm_name = vm_name.clone();
                 let property = property.clone();
                 let mut input = input.clone();
                 return match action {
                     Action::EditChar(c) => {
                         input.push(c);
-                        self.modal = Modal::EditProperty { vm_name, property, input };
+                        self.modal = Modal::EditProperty {
+                            vm_name,
+                            property,
+                            input,
+                        };
                         vec![]
                     }
                     Action::EditBackspace => {
                         input.pop();
-                        self.modal = Modal::EditProperty { vm_name, property, input };
+                        self.modal = Modal::EditProperty {
+                            vm_name,
+                            property,
+                            input,
+                        };
                         vec![]
                     }
                     Action::EditSubmit => {
@@ -187,7 +225,11 @@ impl App {
                         // Invalidate cache so fresh props are fetched after the set
                         self.properties_cache.remove(&vm_name);
                         vec![
-                            SideEffect::SetProperty { vm: vm_name.clone(), property, value: input },
+                            SideEffect::SetProperty {
+                                vm: vm_name.clone(),
+                                property,
+                                value: input,
+                            },
                             SideEffect::FetchProperties(vm_name),
                         ]
                     }
@@ -202,10 +244,22 @@ impl App {
         }
 
         match action {
-            Action::Quit => { self.should_quit = true; vec![] }
-            Action::ShowHelp => { self.modal = Modal::Help; vec![] }
-            Action::HideHelp => { self.modal = Modal::None; vec![] }
-            Action::Cancel   => { self.modal = Modal::None; vec![] }
+            Action::Quit => {
+                self.should_quit = true;
+                vec![]
+            }
+            Action::ShowHelp => {
+                self.modal = Modal::Help;
+                vec![]
+            }
+            Action::HideHelp => {
+                self.modal = Modal::None;
+                vec![]
+            }
+            Action::Cancel => {
+                self.modal = Modal::None;
+                vec![]
+            }
 
             // Enter key — opens/closes the detail popup (EditSubmit is also Enter;
             // when no edit modal is active, treat it identically to ToggleDetail).
@@ -216,7 +270,7 @@ impl App {
                 } else if self.selected_qube().is_some() {
                     self.modal = Modal::Detail;
                     self.detail_scroll = 0;
-                    self.detail_row    = 0;
+                    self.detail_row = 0;
                     // Trigger property fetch if not cached
                     if let Some(name) = self.selected_qube().map(|q| q.name.clone()) {
                         if !self.properties_cache.contains_key(&name) {
@@ -337,7 +391,7 @@ impl App {
                         self.modal = Modal::ConfirmDelete { vm_name: name };
                     } else {
                         self.status = Some(StatusMessage {
-                            text:  "Shut down the qube before deleting".into(),
+                            text: "Shut down the qube before deleting".into(),
                             level: MessageLevel::Warning,
                         });
                     }
@@ -363,7 +417,7 @@ impl App {
                 if let Some(pos) = self.pending_ops.iter().position(|o| o.op_id == op_id) {
                     let op = self.pending_ops.remove(pos);
                     self.status = Some(StatusMessage {
-                        text:  format!("{} {:?} — done", op.vm_name, op.kind),
+                        text: format!("{} {:?} — done", op.vm_name, op.kind),
                         level: MessageLevel::Success,
                     });
                 }
@@ -374,7 +428,7 @@ impl App {
                 if let Some(pos) = self.pending_ops.iter().position(|o| o.op_id == op_id) {
                     let op = self.pending_ops.remove(pos);
                     self.status = Some(StatusMessage {
-                        text:  format!("{} {:?} failed: {}", op.vm_name, op.kind, error),
+                        text: format!("{} {:?} failed: {}", op.vm_name, op.kind, error),
                         level: MessageLevel::Error,
                     });
                 }
@@ -398,7 +452,10 @@ impl App {
     }
 
     pub fn rebuild_filtered(&mut self) {
-        self.filtered_indices = self.qubes.iter().enumerate()
+        self.filtered_indices = self
+            .qubes
+            .iter()
+            .enumerate()
             .filter_map(|(i, q)| {
                 let name_lc = q.name.to_lowercase();
                 let keep = match self.active_view {
@@ -411,9 +468,13 @@ impl App {
                         matches!(q.class, QubeClass::AdminVM) || q.name.starts_with("sys-")
                     }
                     ActiveView::TemplateManager => matches!(q.class, QubeClass::TemplateVM),
-                    ActiveView::WhonixManager   => name_lc.contains("whonix"),
+                    ActiveView::WhonixManager => name_lc.contains("whonix"),
                 };
-                if keep { Some(i) } else { None }
+                if keep {
+                    Some(i)
+                } else {
+                    None
+                }
             })
             .collect();
     }
@@ -445,7 +506,12 @@ impl App {
     fn push_op(&mut self, vm_name: String, kind: OpKind) {
         let op_id = self.next_op_id;
         self.next_op_id += 1;
-        self.pending_ops.push(PendingOp { op_id, vm_name, kind, started: Instant::now() });
+        self.pending_ops.push(PendingOp {
+            op_id,
+            vm_name,
+            kind,
+            started: Instant::now(),
+        });
     }
 
     fn apply_event(&mut self, evt: crate::admin::AdminEvent) {

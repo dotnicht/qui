@@ -1,26 +1,30 @@
-use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use ratatui::Frame;
 
 use crate::app::{ActiveView, App, MessageLevel};
 
 pub fn render_tabs(frame: &mut Frame, area: Rect, app: &App) {
     let mut spans = vec![Span::raw(" ")];
 
-    let tab_style_active   = Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED);
+    let tab_style_active = Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED);
     let tab_style_inactive = Style::default().fg(Color::DarkGray);
 
     let tabs = [
-        (ActiveView::QubeManager,    "[1] Qubes"),
-        (ActiveView::ServiceManager,  "[2] Services"),
+        (ActiveView::QubeManager, "[1] Qubes"),
+        (ActiveView::ServiceManager, "[2] Services"),
         (ActiveView::TemplateManager, "[3] Templates"),
-        (ActiveView::WhonixManager,   "[4] Whonix"),
+        (ActiveView::WhonixManager, "[4] Whonix"),
     ];
 
     for (view, label) in &tabs {
-        let style = if app.active_view == *view { tab_style_active } else { tab_style_inactive };
+        let style = if app.active_view == *view {
+            tab_style_active
+        } else {
+            tab_style_inactive
+        };
         spans.push(Span::styled(format!(" {label} "), style));
         spans.push(Span::raw("  "));
     }
@@ -29,9 +33,9 @@ pub fn render_tabs(frame: &mut Frame, area: Rect, app: &App) {
     let hint = " ?=help  q=quit ";
     let hint_width = hint.len() as u16;
     if area.width > hint_width + 20 {
-        let pad_width = area.width.saturating_sub(
-            spans.iter().map(|s| s.content.len() as u16).sum::<u16>() + hint_width
-        );
+        let pad_width = area
+            .width
+            .saturating_sub(spans.iter().map(|s| s.content.len() as u16).sum::<u16>() + hint_width);
         spans.push(Span::raw(" ".repeat(pad_width as usize)));
         spans.push(Span::styled(hint, Style::default().fg(Color::DarkGray)));
     }
@@ -53,8 +57,8 @@ pub fn render_bottom(frame: &mut Frame, hints_area: Rect, status_area: Rect, app
             let c = match msg.level {
                 MessageLevel::Success => Color::Green,
                 MessageLevel::Warning => Color::Yellow,
-                MessageLevel::Error   => Color::Red,
-                MessageLevel::Info    => Color::Cyan,
+                MessageLevel::Error => Color::Red,
+                MessageLevel::Info => Color::Cyan,
             };
             (format!(" {}", msg.text), c)
         }
@@ -71,7 +75,8 @@ pub fn render_bottom(frame: &mut Frame, hints_area: Rect, status_area: Rect, app
     let status_line = if pending_str.is_empty() {
         Line::from(vec![Span::styled(text, Style::default().fg(color))])
     } else {
-        let pad = status_area.width
+        let pad = status_area
+            .width
             .saturating_sub(text.len() as u16 + pending_str.len() as u16);
         Line::from(vec![
             Span::styled(text, Style::default().fg(color)),
