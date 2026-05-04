@@ -28,9 +28,46 @@ jobs:
 
       - name: Publish test results
         if: always()
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          files: target/nextest/ci/junit.xml
+        run: |
+          python3 - <<'EOF'
+          import xml.etree.ElementTree as ET, os, sys
+
+          path = "target/nextest/ci/junit.xml"
+          if not os.path.exists(path):
+              print("No test results found.", file=sys.stderr)
+              sys.exit(0)
+
+          tree = ET.parse(path)
+          root = tree.getroot()
+          suite = root.find("testsuite") or root
+
+          total   = int(suite.get("tests",    0))
+          failed  = int(suite.get("failures", 0)) + int(suite.get("errors", 0))
+          skipped = int(suite.get("skipped",  0))
+          passed  = total - failed - skipped
+          time    = suite.get("time", "?")
+
+          lines = []
+          lines.append(f"## Test Results")
+          lines.append(f"")
+          icon = "✅" if failed == 0 else "❌"
+          lines.append(f"{icon} **{passed} passed** · {failed} failed · {skipped} skipped · {total} total · {time}s")
+          lines.append("")
+          lines.append("| Status | Test |")
+          lines.append("|--------|------|")
+
+          for tc in suite.findall("testcase"):
+              name = tc.get("name", "?")
+              if tc.find("failure") is not None or tc.find("error") is not None:
+                  lines.append(f"| ❌ | `{name}` |")
+              elif tc.find("skipped") is not None:
+                  lines.append(f"| ⏭️ | `{name}` |")
+              else:
+                  lines.append(f"| ✅ | `{name}` |")
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write("\n".join(lines) + "\n")
+          EOF
 
       - name: Clippy
         run: cargo clippy -- -D warnings
