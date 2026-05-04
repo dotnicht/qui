@@ -28,7 +28,9 @@ fn translate_key(key: KeyEvent) -> Option<Action> {
 
         // Tab switching
         (Char('1'), _) => Some(Action::SwitchToQubeManager),
-        (Char('2'), _) => Some(Action::SwitchToTemplateManager),
+        (Char('2'), _) => Some(Action::SwitchToServiceManager),
+        (Char('3'), _) => Some(Action::SwitchToTemplateManager),
+        (Char('4'), _) => Some(Action::SwitchToWhonixManager),
 
         // VM operations (only meaningful when no modal is open)
         (Char('s'), Mods::NONE) => Some(Action::StartSelected),

@@ -37,7 +37,9 @@ pub enum Action {
 
     // View switching
     SwitchToQubeManager,
+    SwitchToServiceManager,
     SwitchToTemplateManager,
+    SwitchToWhonixManager,
     ShowHelp,
     HideHelp,
     ToggleDetail,

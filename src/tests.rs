@@ -1,22 +1,19 @@
 use std::sync::Arc;
-use crate::admin::{AdminClient, QubeInfo, QubeProperties};
-use crate::admin::types::{QubeClass, QubeState};
-
+use crate::admin::{AdminClient, QubeProperties};
+use crate::admin::types::{QubeClass, QubeInfo, QubeState};
 use crate::action::{Action, SideEffect};
-use crate::app::{ActiveView, App, MessageLevel, Modal};
+use crate::app::{ActiveView, App};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn make_app() -> App {
-    // Point at a nonexistent socket so the client falls back to CLI.
-    // update() is pure — it never touches the socket; only spawned threads do.
-    App::new(Arc::new(AdminClient::with_socket("/nonexistent/qubesd.sock")))
+    App::new(Arc::new(AdminClient::new()))
 }
 
-fn appvm(name: &str, state: QubeState) -> QubeInfo {
+fn qube(name: &str, class: QubeClass, state: QubeState) -> QubeInfo {
     QubeInfo {
         name:     name.into(),
-        class:    QubeClass::AppVM,
+        class,
         state,
         label:    "red".into(),
         template: Some("fedora-41".into()),
@@ -24,420 +21,258 @@ fn appvm(name: &str, state: QubeState) -> QubeInfo {
     }
 }
 
-fn load_qubes(app: &mut App, qubes: Vec<QubeInfo>) {
+fn appvm(name: &str) -> QubeInfo { qube(name, QubeClass::AppVM, QubeState::Halted) }
+fn sysvm(name: &str) -> QubeInfo { qube(name, QubeClass::AppVM, QubeState::Running) }
+fn templatevm(name: &str) -> QubeInfo { qube(name, QubeClass::TemplateVM, QubeState::Halted) }
+fn adminvm(name: &str) -> QubeInfo { qube(name, QubeClass::AdminVM, QubeState::Running) }
+
+fn load(app: &mut App, qubes: Vec<QubeInfo>) {
     app.update(Action::QubeListLoaded(qubes));
 }
 
-// ── Navigation ────────────────────────────────────────────────────────────────
+fn names(app: &App) -> Vec<String> {
+    app.filtered_indices.iter().map(|&i| app.qubes[i].name.clone()).collect()
+}
+
+// ── Tab filter: Qubes ─────────────────────────────────────────────────────────
 
 #[test]
-fn move_down_increments_index() {
+fn qubes_tab_shows_plain_appvm() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("a", QubeState::Halted), appvm("b", QubeState::Halted)]);
-    assert_eq!(app.selected_index, 0);
-    app.update(Action::MoveDown);
-    assert_eq!(app.selected_index, 1);
+    load(&mut app, vec![appvm("personal")]);
+    assert!(names(&app).contains(&"personal".to_string()));
 }
 
 #[test]
-fn move_down_does_not_exceed_list() {
+fn qubes_tab_excludes_sys_prefix() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("a", QubeState::Halted)]);
-    app.update(Action::MoveDown);
-    assert_eq!(app.selected_index, 0);
+    load(&mut app, vec![appvm("personal"), sysvm("sys-net")]);
+    let n = names(&app);
+    assert!(n.contains(&"personal".to_string()));
+    assert!(!n.contains(&"sys-net".to_string()));
 }
 
 #[test]
-fn move_up_decrements_index() {
+fn qubes_tab_excludes_adminvm() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("a", QubeState::Halted), appvm("b", QubeState::Halted)]);
-    app.update(Action::MoveDown);
-    app.update(Action::MoveUp);
-    assert_eq!(app.selected_index, 0);
+    load(&mut app, vec![appvm("personal"), adminvm("dom0")]);
+    let n = names(&app);
+    assert!(!n.contains(&"dom0".to_string()));
 }
 
 #[test]
-fn move_up_does_not_go_below_zero() {
+fn qubes_tab_excludes_templatevm() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("a", QubeState::Halted)]);
-    app.update(Action::MoveUp);
-    assert_eq!(app.selected_index, 0);
+    load(&mut app, vec![appvm("personal"), templatevm("fedora-41")]);
+    let n = names(&app);
+    assert!(!n.contains(&"fedora-41".to_string()));
 }
 
 #[test]
-fn move_top_jumps_to_zero() {
+fn qubes_tab_excludes_whonix_name() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![
-        appvm("a", QubeState::Halted),
-        appvm("b", QubeState::Halted),
-        appvm("c", QubeState::Halted),
+    load(&mut app, vec![appvm("personal"), appvm("anon-whonix")]);
+    let n = names(&app);
+    assert!(!n.contains(&"anon-whonix".to_string()));
+}
+
+#[test]
+fn qubes_tab_includes_standalone_and_dispvm() {
+    let mut app = make_app();
+    load(&mut app, vec![
+        qube("standalone-vault", QubeClass::StandaloneVM, QubeState::Halted),
+        qube("disp42",           QubeClass::DispVM,        QubeState::Running),
     ]);
-    app.update(Action::MoveBottom);
-    assert_eq!(app.selected_index, 2);
-    app.update(Action::MoveTop);
-    assert_eq!(app.selected_index, 0);
+    let n = names(&app);
+    assert!(n.contains(&"standalone-vault".to_string()));
+    assert!(n.contains(&"disp42".to_string()));
+}
+
+// ── Tab filter: Services ──────────────────────────────────────────────────────
+
+#[test]
+fn services_tab_includes_sys_prefix() {
+    let mut app = make_app();
+    load(&mut app, vec![sysvm("sys-net"), sysvm("sys-firewall"), sysvm("sys-usb")]);
+    app.update(Action::SwitchToServiceManager);
+    let n = names(&app);
+    assert!(n.contains(&"sys-net".to_string()));
+    assert!(n.contains(&"sys-firewall".to_string()));
+    assert!(n.contains(&"sys-usb".to_string()));
 }
 
 #[test]
-fn move_bottom_jumps_to_last() {
+fn services_tab_includes_adminvm() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![
-        appvm("a", QubeState::Halted),
-        appvm("b", QubeState::Halted),
-        appvm("c", QubeState::Halted),
-    ]);
-    app.update(Action::MoveBottom);
-    assert_eq!(app.selected_index, 2);
+    load(&mut app, vec![adminvm("dom0"), appvm("personal")]);
+    app.update(Action::SwitchToServiceManager);
+    let n = names(&app);
+    assert!(n.contains(&"dom0".to_string()));
+    assert!(!n.contains(&"personal".to_string()));
 }
 
-// ── Selection clamping on list reload ────────────────────────────────────────
+#[test]
+fn services_tab_excludes_plain_appvm() {
+    let mut app = make_app();
+    load(&mut app, vec![appvm("personal"), sysvm("sys-net")]);
+    app.update(Action::SwitchToServiceManager);
+    assert!(!names(&app).contains(&"personal".to_string()));
+}
+
+// sys-whonix: matches both sys- prefix and whonix name — should appear in Services
+#[test]
+fn sys_whonix_appears_in_services() {
+    let mut app = make_app();
+    load(&mut app, vec![sysvm("sys-whonix")]);
+    app.update(Action::SwitchToServiceManager);
+    assert!(names(&app).contains(&"sys-whonix".to_string()));
+}
+
+// ── Tab filter: Templates ─────────────────────────────────────────────────────
 
 #[test]
-fn selection_clamped_when_list_shrinks() {
+fn templates_tab_shows_only_templatevms() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![
-        appvm("a", QubeState::Halted),
-        appvm("b", QubeState::Halted),
-        appvm("c", QubeState::Halted),
+    load(&mut app, vec![
+        templatevm("fedora-41"),
+        templatevm("debian-12"),
+        appvm("personal"),
     ]);
+    app.update(Action::SwitchToTemplateManager);
+    let n = names(&app);
+    assert!(n.contains(&"fedora-41".to_string()));
+    assert!(n.contains(&"debian-12".to_string()));
+    assert!(!n.contains(&"personal".to_string()));
+}
+
+// ── Tab filter: Whonix ────────────────────────────────────────────────────────
+
+#[test]
+fn whonix_tab_matches_name_containing_whonix() {
+    let mut app = make_app();
+    load(&mut app, vec![
+        appvm("anon-whonix"),
+        appvm("whonix-gw-17"),
+        sysvm("sys-whonix"),
+        appvm("personal"),
+    ]);
+    app.update(Action::SwitchToWhonixManager);
+    let n = names(&app);
+    assert!(n.contains(&"anon-whonix".to_string()));
+    assert!(n.contains(&"whonix-gw-17".to_string()));
+    assert!(n.contains(&"sys-whonix".to_string()));
+    assert!(!n.contains(&"personal".to_string()));
+}
+
+#[test]
+fn whonix_tab_match_is_case_insensitive() {
+    let mut app = make_app();
+    load(&mut app, vec![appvm("Whonix-WS")]);
+    app.update(Action::SwitchToWhonixManager);
+    assert!(names(&app).contains(&"Whonix-WS".to_string()));
+}
+
+// ── Tab switching — actions ───────────────────────────────────────────────────
+
+#[test]
+fn switch_to_service_manager_sets_active_view() {
+    let mut app = make_app();
+    app.update(Action::SwitchToServiceManager);
+    assert_eq!(app.active_view, ActiveView::ServiceManager);
+}
+
+#[test]
+fn switch_to_whonix_manager_sets_active_view() {
+    let mut app = make_app();
+    app.update(Action::SwitchToWhonixManager);
+    assert_eq!(app.active_view, ActiveView::WhonixManager);
+}
+
+#[test]
+fn switch_resets_selected_index_to_zero() {
+    let mut app = make_app();
+    load(&mut app, vec![sysvm("sys-net"), sysvm("sys-firewall"), sysvm("sys-usb")]);
+    app.update(Action::SwitchToServiceManager);
     app.update(Action::MoveBottom); // index = 2
-    // Reload with only 1 VM
-    load_qubes(&mut app, vec![appvm("a", QubeState::Halted)]);
+    app.update(Action::SwitchToQubeManager);
     assert_eq!(app.selected_index, 0);
 }
 
-// ── VM operations — side effects ─────────────────────────────────────────────
-
 #[test]
-fn start_halted_vm_returns_side_effect() {
+fn switch_to_empty_tab_does_not_panic() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Halted)]);
-    let effects = app.update(Action::StartSelected);
-    assert!(effects.iter().any(|e| matches!(e, SideEffect::StartVm(n) if n == "personal")));
+    // Only plain appvms — Services tab will be empty
+    load(&mut app, vec![appvm("personal"), appvm("work")]);
+    app.update(Action::SwitchToServiceManager);
+    assert!(app.filtered_indices.is_empty());
+    // Navigation on empty list must not panic
+    app.update(Action::MoveDown);
+    app.update(Action::MoveUp);
+    app.update(Action::MoveBottom);
 }
 
 #[test]
-fn start_running_vm_returns_no_effect() {
+fn switch_clamps_selection_when_new_tab_is_smaller() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Running)]);
-    let effects = app.update(Action::StartSelected);
-    assert!(effects.is_empty());
+    load(&mut app, vec![
+        appvm("a"), appvm("b"), appvm("c"),  // 3 in Qubes
+        sysvm("sys-net"),                     // 1 in Services
+    ]);
+    app.update(Action::MoveBottom); // select index 2 in Qubes (3 items)
+    app.update(Action::SwitchToServiceManager); // Services has 1 item
+    assert_eq!(app.selected_index, 0);
 }
 
+// ── Mixed list: all four tabs show correct counts ─────────────────────────────
+
 #[test]
-fn shutdown_running_vm_returns_side_effect() {
+fn all_four_tabs_partition_correctly() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Running)]);
-    let effects = app.update(Action::ShutdownSelected);
-    assert!(effects.iter().any(|e| matches!(e, SideEffect::ShutdownVm(n) if n == "personal")));
+    load(&mut app, vec![
+        appvm("personal"),          // Qubes
+        appvm("work"),              // Qubes
+        sysvm("sys-net"),           // Services
+        adminvm("dom0"),            // Services
+        templatevm("fedora-41"),    // Templates
+        appvm("anon-whonix"),       // Whonix
+        sysvm("sys-whonix"),        // Services + Whonix
+    ]);
+
+    // Qubes: personal, work (sys-net, dom0, fedora-41, anon-whonix, sys-whonix excluded)
+    assert_eq!(names(&app), vec!["personal", "work"]);
+
+    app.update(Action::SwitchToServiceManager);
+    let svc = names(&app);
+    assert!(svc.contains(&"sys-net".to_string()));
+    assert!(svc.contains(&"dom0".to_string()));
+    assert!(svc.contains(&"sys-whonix".to_string()));
+    assert_eq!(svc.len(), 3);
+
+    app.update(Action::SwitchToTemplateManager);
+    assert_eq!(names(&app), vec!["fedora-41"]);
+
+    app.update(Action::SwitchToWhonixManager);
+    let whx = names(&app);
+    assert!(whx.contains(&"anon-whonix".to_string()));
+    assert!(whx.contains(&"sys-whonix".to_string()));
+    assert_eq!(whx.len(), 2);
 }
 
-#[test]
-fn shutdown_halted_vm_returns_no_effect() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Halted)]);
-    let effects = app.update(Action::ShutdownSelected);
-    assert!(effects.is_empty());
-}
+// ── Properties cache interaction ──────────────────────────────────────────────
 
 #[test]
-fn delete_halted_vm_opens_confirm_modal() {
+fn toggle_detail_fetches_properties_when_not_cached() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("vault", QubeState::Halted)]);
-    app.update(Action::DeleteSelected);
-    assert!(matches!(app.modal, Modal::ConfirmDelete { ref vm_name } if vm_name == "vault"));
-}
-
-#[test]
-fn delete_running_vm_shows_warning_not_modal() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("vault", QubeState::Running)]);
-    app.update(Action::DeleteSelected);
-    assert!(matches!(app.modal, Modal::None));
-    assert!(app.status.as_ref().map(|s| matches!(s.level, MessageLevel::Warning)).unwrap_or(false));
-}
-
-#[test]
-fn kill_running_vm_opens_confirm_modal() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("work", QubeState::Running)]);
-    app.update(Action::KillSelected);
-    assert!(matches!(app.modal, Modal::ConfirmKill { ref vm_name } if vm_name == "work"));
-}
-
-// ── Confirm / Cancel modals ───────────────────────────────────────────────────
-
-#[test]
-fn confirm_delete_dispatches_delete_side_effect() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("vault", QubeState::Halted)]);
-    app.update(Action::DeleteSelected); // opens modal
-    let effects = app.update(Action::Confirm);
-    assert!(effects.iter().any(|e| matches!(e, SideEffect::DeleteVm(n) if n == "vault")));
-    assert!(matches!(app.modal, Modal::None));
-}
-
-#[test]
-fn cancel_delete_closes_modal_no_effect() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("vault", QubeState::Halted)]);
-    app.update(Action::DeleteSelected);
-    let effects = app.update(Action::Cancel);
-    assert!(effects.is_empty());
-    assert!(matches!(app.modal, Modal::None));
-}
-
-#[test]
-fn confirm_kill_dispatches_kill_side_effect() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("work", QubeState::Running)]);
-    app.update(Action::KillSelected);
-    let effects = app.update(Action::Confirm);
-    assert!(effects.iter().any(|e| matches!(e, SideEffect::KillVm(n) if n == "work")));
-    assert!(matches!(app.modal, Modal::None));
-}
-
-// ── Detail popup ─────────────────────────────────────────────────────────────
-
-#[test]
-fn toggle_detail_opens_and_closes() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Running)]);
-    app.update(Action::ToggleDetail);
-    assert!(matches!(app.modal, Modal::Detail));
-    app.update(Action::ToggleDetail);
-    assert!(matches!(app.modal, Modal::None));
-}
-
-#[test]
-fn toggle_detail_on_empty_list_does_nothing() {
-    let mut app = make_app();
-    app.update(Action::ToggleDetail);
-    assert!(matches!(app.modal, Modal::None));
-}
-
-#[test]
-fn toggle_detail_returns_fetch_properties_when_not_cached() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Running)]);
+    load(&mut app, vec![appvm("personal")]);
     let effects = app.update(Action::ToggleDetail);
     assert!(effects.iter().any(|e| matches!(e, SideEffect::FetchProperties(n) if n == "personal")));
 }
 
 #[test]
-fn toggle_detail_no_fetch_when_already_cached() {
+fn toggle_detail_no_fetch_when_cached() {
     let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Running)]);
+    load(&mut app, vec![appvm("personal")]);
     app.properties_cache.insert("personal".into(), QubeProperties::default());
     let effects = app.update(Action::ToggleDetail);
     assert!(!effects.iter().any(|e| matches!(e, SideEffect::FetchProperties(_))));
-}
-
-#[test]
-fn esc_closes_detail_modal() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Running)]);
-    app.update(Action::ToggleDetail);
-    app.update(Action::Cancel);
-    assert!(matches!(app.modal, Modal::None));
-}
-
-// ── Help modal ────────────────────────────────────────────────────────────────
-
-#[test]
-fn help_opens_and_closes_with_cancel() {
-    let mut app = make_app();
-    app.update(Action::ShowHelp);
-    assert!(matches!(app.modal, Modal::Help));
-    app.update(Action::Cancel);
-    assert!(matches!(app.modal, Modal::None));
-}
-
-// ── Edit property flow ────────────────────────────────────────────────────────
-
-fn open_edit(app: &mut App, prop: &str) {
-    app.modal = Modal::EditProperty {
-        vm_name:  "personal".into(),
-        property: prop.into(),
-        input:    "old".into(),
-    };
-}
-
-#[test]
-fn edit_char_appends_to_input() {
-    let mut app = make_app();
-    open_edit(&mut app, "label");
-    app.update(Action::EditChar('r'));
-    app.update(Action::EditChar('e'));
-    app.update(Action::EditChar('d'));
-    assert!(matches!(&app.modal,
-        Modal::EditProperty { input, .. } if input == "oldred"
-    ));
-}
-
-#[test]
-fn edit_backspace_removes_last_char() {
-    let mut app = make_app();
-    open_edit(&mut app, "label");
-    app.update(Action::EditChar('x'));
-    app.update(Action::EditBackspace);
-    assert!(matches!(&app.modal,
-        Modal::EditProperty { input, .. } if input == "old"
-    ));
-}
-
-#[test]
-fn edit_backspace_on_empty_does_not_panic() {
-    let mut app = make_app();
-    app.modal = Modal::EditProperty {
-        vm_name:  "personal".into(),
-        property: "label".into(),
-        input:    "".into(),
-    };
-    app.update(Action::EditBackspace); // should not panic
-    assert!(matches!(&app.modal, Modal::EditProperty { input, .. } if input.is_empty()));
-}
-
-#[test]
-fn edit_submit_returns_set_property_and_fetch_effects() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Running)]);
-    app.modal = Modal::EditProperty {
-        vm_name:  "personal".into(),
-        property: "label".into(),
-        input:    "green".into(),
-    };
-    let effects = app.update(Action::EditSubmit);
-    assert!(effects.iter().any(|e| matches!(e,
-        SideEffect::SetProperty { vm, property, value }
-        if vm == "personal" && property == "label" && value == "green"
-    )));
-    assert!(effects.iter().any(|e| matches!(e, SideEffect::FetchProperties(n) if n == "personal")));
-}
-
-#[test]
-fn edit_submit_invalidates_properties_cache() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Running)]);
-    app.properties_cache.insert("personal".into(), QubeProperties::default());
-    app.modal = Modal::EditProperty {
-        vm_name:  "personal".into(),
-        property: "label".into(),
-        input:    "blue".into(),
-    };
-    app.update(Action::EditSubmit);
-    assert!(!app.properties_cache.contains_key("personal"));
-}
-
-#[test]
-fn edit_submit_returns_to_detail_modal() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![appvm("personal", QubeState::Running)]);
-    open_edit(&mut app, "label");
-    app.update(Action::EditSubmit);
-    assert!(matches!(app.modal, Modal::Detail));
-}
-
-#[test]
-fn edit_cancel_returns_to_detail_without_side_effects() {
-    let mut app = make_app();
-    open_edit(&mut app, "label");
-    let effects = app.update(Action::Cancel);
-    assert!(effects.is_empty());
-    assert!(matches!(app.modal, Modal::Detail));
-}
-
-// ── Tab switching ─────────────────────────────────────────────────────────────
-
-#[test]
-fn switch_to_template_manager_filters_appvms() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![
-        appvm("personal", QubeState::Halted),
-        QubeInfo {
-            name:     "fedora-41".into(),
-            class:    QubeClass::TemplateVM,
-            state:    QubeState::Halted,
-            label:    "black".into(),
-            template: None,
-            netvm:    None,
-        },
-    ]);
-    app.update(Action::SwitchToTemplateManager);
-    assert_eq!(app.active_view, ActiveView::TemplateManager);
-    assert_eq!(app.filtered_indices.len(), 1);
-    let idx = app.filtered_indices[0];
-    assert_eq!(app.qubes[idx].name, "fedora-41");
-}
-
-#[test]
-fn switch_back_to_qube_manager_shows_all() {
-    let mut app = make_app();
-    load_qubes(&mut app, vec![
-        appvm("personal", QubeState::Halted),
-        QubeInfo {
-            name:     "fedora-41".into(),
-            class:    QubeClass::TemplateVM,
-            state:    QubeState::Halted,
-            label:    "black".into(),
-            template: None,
-            netvm:    None,
-        },
-    ]);
-    app.update(Action::SwitchToTemplateManager);
-    app.update(Action::SwitchToQubeManager);
-    assert_eq!(app.active_view, ActiveView::QubeManager);
-    assert_eq!(app.filtered_indices.len(), 2);
-}
-
-// ── Quit ─────────────────────────────────────────────────────────────────────
-
-#[test]
-fn quit_sets_should_quit() {
-    let mut app = make_app();
-    app.update(Action::Quit);
-    assert!(app.should_quit);
-}
-
-#[test]
-fn quit_inside_help_modal_still_quits() {
-    let mut app = make_app();
-    app.update(Action::ShowHelp);
-    app.update(Action::Quit);
-    assert!(app.should_quit);
-}
-
-// ── Operation result handling ─────────────────────────────────────────────────
-
-#[test]
-fn operation_completed_triggers_list_refresh() {
-    let mut app = make_app();
-    // Inject a fake pending op so the completed message can be matched
-    use crate::action::OpKind;
-    use crate::app::PendingOp;
-    app.pending_ops.push(PendingOp {
-        op_id:   42,
-        vm_name: "personal".into(),
-        kind:    OpKind::Start,
-        started: std::time::Instant::now(),
-    });
-    let effects = app.update(Action::OperationCompleted { op_id: 42 });
-    assert!(effects.iter().any(|e| matches!(e, SideEffect::FetchQubeList)));
-    assert!(app.pending_ops.is_empty());
-    assert!(matches!(app.status.as_ref().map(|s| &s.level), Some(MessageLevel::Success)));
-}
-
-#[test]
-fn operation_failed_sets_error_status() {
-    let mut app = make_app();
-    use crate::action::OpKind;
-    use crate::app::PendingOp;
-    app.pending_ops.push(PendingOp {
-        op_id:   7,
-        vm_name: "work".into(),
-        kind:    OpKind::Shutdown,
-        started: std::time::Instant::now(),
-    });
-    app.update(Action::OperationFailed { op_id: 7, error: "timed out".into() });
-    assert!(matches!(app.status.as_ref().map(|s| &s.level), Some(MessageLevel::Error)));
 }

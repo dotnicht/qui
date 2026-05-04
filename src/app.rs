@@ -11,7 +11,9 @@ use crate::action::{Action, OpKind, SideEffect};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActiveView {
     QubeManager,
+    ServiceManager,
     TemplateManager,
+    WhonixManager,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -262,8 +264,20 @@ impl App {
                 self.rebuild_filtered();
                 vec![]
             }
+            Action::SwitchToServiceManager => {
+                self.active_view = ActiveView::ServiceManager;
+                self.selected_index = 0;
+                self.rebuild_filtered();
+                vec![]
+            }
             Action::SwitchToTemplateManager => {
                 self.active_view = ActiveView::TemplateManager;
+                self.selected_index = 0;
+                self.rebuild_filtered();
+                vec![]
+            }
+            Action::SwitchToWhonixManager => {
+                self.active_view = ActiveView::WhonixManager;
                 self.selected_index = 0;
                 self.rebuild_filtered();
                 vec![]
@@ -386,9 +400,18 @@ impl App {
     pub fn rebuild_filtered(&mut self) {
         self.filtered_indices = self.qubes.iter().enumerate()
             .filter_map(|(i, q)| {
+                let name_lc = q.name.to_lowercase();
                 let keep = match self.active_view {
-                    ActiveView::QubeManager    => true,
+                    ActiveView::QubeManager => {
+                        !matches!(q.class, QubeClass::TemplateVM | QubeClass::AdminVM)
+                            && !q.name.starts_with("sys-")
+                            && !name_lc.contains("whonix")
+                    }
+                    ActiveView::ServiceManager => {
+                        matches!(q.class, QubeClass::AdminVM) || q.name.starts_with("sys-")
+                    }
                     ActiveView::TemplateManager => matches!(q.class, QubeClass::TemplateVM),
+                    ActiveView::WhonixManager   => name_lc.contains("whonix"),
                 };
                 if keep { Some(i) } else { None }
             })

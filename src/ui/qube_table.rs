@@ -49,7 +49,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &mut TableState) 
 
     let title = match app.active_view {
         crate::app::ActiveView::QubeManager    => " Qubes ",
+        crate::app::ActiveView::ServiceManager  => " Services ",
         crate::app::ActiveView::TemplateManager => " Templates ",
+        crate::app::ActiveView::WhonixManager   => " Whonix ",
     };
 
     let table = Table::new(rows, [

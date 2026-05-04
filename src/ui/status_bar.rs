@@ -14,7 +14,9 @@ pub fn render_tabs(frame: &mut Frame, area: Rect, app: &App) {
 
     let tabs = [
         (ActiveView::QubeManager,    "[1] Qubes"),
-        (ActiveView::TemplateManager, "[2] Templates"),
+        (ActiveView::ServiceManager,  "[2] Services"),
+        (ActiveView::TemplateManager, "[3] Templates"),
+        (ActiveView::WhonixManager,   "[4] Whonix"),
     ];
 
     for (view, label) in &tabs {
