@@ -1,55 +1,66 @@
 #!/usr/bin/env bash
-# Set alacritty as the default terminal across dom0 and all qubes.
-#
-# Run from dom0. Targets every running TemplateVM and AppVM by default,
-# or a specific list passed as arguments.
+# Set alacritty as the default terminal in the current VM.
+# When run from dom0, also propagates to all running qubes.
 #
 # Usage:
-#   bash set-alacritty-terminal.sh [vm1 vm2 ...]
-#
-# What it does:
-#   dom0  — writes a qubes-run-terminal.desktop override and sets it via xdg-mime
-#   qubes — drops the same desktop file into each VM via qvm-run
+#   bash set-alacritty-terminal.sh [vm1 vm2 ...]   # dom0 only: target specific VMs
 set -euo pipefail
 
-DESKTOP_CONTENT='[Desktop Entry]
+APPS_DIR="$HOME/.local/share/applications"
+DESKTOP_FILE="qubes-run-terminal.desktop"
+MIMEAPPS="$HOME/.config/mimeapps.list"
+
+# ── configure local VM (or dom0) ─────────────────────────────────────────────
+configure_local() {
+    mkdir -p "$APPS_DIR" "$(dirname "$MIMEAPPS")"
+
+    cat > "$APPS_DIR/$DESKTOP_FILE" << 'EOF'
+[Desktop Entry]
 Name=Alacritty
 Exec=alacritty
 Type=Application
 NoDisplay=true
-'
+EOF
 
-DOM0_APPS_DIR="$HOME/.local/share/applications"
-DESKTOP_FILE="qubes-run-terminal.desktop"
-MIME_TYPE="x-scheme-handler/qubes-run-terminal"
+    # mimeapps.list is more reliable than xdg-mime in minimal environments
+    if grep -q '^\[Default Applications\]' "$MIMEAPPS" 2>/dev/null; then
+        # remove any existing entry for this mime type then re-add
+        sed -i '/^x-scheme-handler\/qubes-run-terminal=/d' "$MIMEAPPS"
+        sed -i '/^\[Default Applications\]/a x-scheme-handler\/qubes-run-terminal=qubes-run-terminal.desktop' "$MIMEAPPS"
+    else
+        printf '[Default Applications]\nx-scheme-handler/qubes-run-terminal=qubes-run-terminal.desktop\n' >> "$MIMEAPPS"
+    fi
 
-# ── dom0 ──────────────────────────────────────────────────────────────────────
-echo "[*] Configuring dom0"
-mkdir -p "$DOM0_APPS_DIR"
-printf '%s' "$DESKTOP_CONTENT" > "$DOM0_APPS_DIR/$DESKTOP_FILE"
-xdg-mime default "$DESKTOP_FILE" "$MIME_TYPE" 2>/dev/null || true
-update-desktop-database "$DOM0_APPS_DIR" 2>/dev/null || true
-echo "[+] dom0 done"
+    update-desktop-database "$APPS_DIR" 2>/dev/null || true
+}
 
-# ── qubes ─────────────────────────────────────────────────────────────────────
-if [[ $# -gt 0 ]]; then
-    VMS=("$@")
-else
-    mapfile -t VMS < <(qvm-ls --running --raw-data --fields name 2>/dev/null | grep -v '^dom0$')
+echo "[*] Configuring local VM"
+configure_local
+echo "[+] Local done"
+
+# ── dispatch to other qubes if running in dom0 ───────────────────────────────
+if ! command -v qvm-run &>/dev/null; then
+    echo "[*] qvm-run not found — skipping other VMs (run from dom0 to propagate)"
+    exit 0
 fi
+
+if [[ $# -gt 0 ]]; then
+    mapfile -t VMS < <(printf '%s\n' "$@")
+else
+    mapfile -t VMS < <(qvm-ls --raw-data --fields name,state 2>/dev/null \
+        | awk -F'|' '$2=="Running" && $1!="dom0" {print $1}')
+fi
+
+SCRIPT=$(readlink -f "$0")
 
 for vm in "${VMS[@]}"; do
     [[ -z "$vm" ]] && continue
     echo "[*] Configuring $vm"
-    qvm-run --pass-io --user=user "$vm" "
-        set -euo pipefail
-        mkdir -p \"\$HOME/.local/share/applications\"
-        cat > \"\$HOME/.local/share/applications/$DESKTOP_FILE\" << 'DESKTOP'
-$DESKTOP_CONTENT
-DESKTOP
-        xdg-mime default '$DESKTOP_FILE' '$MIME_TYPE' 2>/dev/null || true
-        update-desktop-database \"\$HOME/.local/share/applications\" 2>/dev/null || true
-    " && echo "[+] $vm done" || echo "[!] $vm failed (skipping)"
+    qvm-copy-to-vm "$vm" "$SCRIPT" 2>/dev/null \
+        && qvm-run --pass-io --user=user "$vm" \
+            "bash \"\$HOME/QubesIncoming/dom0/$(basename "$SCRIPT")\"" \
+        && echo "[+] $vm done" \
+        || echo "[!] $vm failed (skipping)"
 done
 
-echo "[*] All done. Qubes that were not running must be configured on next boot or run manually."
+echo "[*] Done."
