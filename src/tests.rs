@@ -88,22 +88,36 @@ fn qubes_tab_excludes_whonix_name() {
 }
 
 #[test]
-fn qubes_tab_includes_standalone_and_dispvm() {
+fn qubes_tab_includes_standalone_excludes_dispvm() {
     let mut app = make_app();
     load(
         &mut app,
         vec![
-            qube(
-                "standalone-vault",
-                QubeClass::StandaloneVM,
-                QubeState::Halted,
-            ),
+            qube("standalone-vault", QubeClass::StandaloneVM, QubeState::Halted),
             qube("disp42", QubeClass::DispVM, QubeState::Running),
         ],
     );
     let n = names(&app);
     assert!(n.contains(&"standalone-vault".to_string()));
+    assert!(!n.contains(&"disp42".to_string()));
+}
+
+#[test]
+fn disposables_tab_includes_dispvm_and_dvm_suffix() {
+    let mut app = make_app();
+    load(
+        &mut app,
+        vec![
+            qube("disp42", QubeClass::DispVM, QubeState::Running),
+            qube("anon-whonix-dvm", QubeClass::AppVM, QubeState::Halted),
+            qube("personal", QubeClass::AppVM, QubeState::Halted),
+        ],
+    );
+    app.update(Action::SwitchToDisposableManager);
+    let n = names(&app);
     assert!(n.contains(&"disp42".to_string()));
+    assert!(n.contains(&"anon-whonix-dvm".to_string()));
+    assert!(!n.contains(&"personal".to_string()));
 }
 
 // ── Tab filter: Services ──────────────────────────────────────────────────────
