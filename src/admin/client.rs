@@ -204,8 +204,7 @@ fn cli_list_qubes() -> AdminResult<Vec<QubeInfo>> {
     let text = std::str::from_utf8(&out.stdout).map_err(|e| AdminError::Parse(e.to_string()))?;
 
     let mut qubes = Vec::new();
-    for line in text.lines().skip(1) {
-        // skip header
+    for line in text.lines() {
         let line = line.trim();
         if line.is_empty() {
             continue;
