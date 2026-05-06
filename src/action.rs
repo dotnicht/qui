@@ -44,6 +44,8 @@ pub enum Action {
     SwitchToServiceManager,
     SwitchToTemplateManager,
     SwitchToWhonixManager,
+    SwitchToDisposableManager,
+    SwitchToAll,
     ShowHelp,
     HideHelp,
     ToggleDetail,
@@ -59,6 +61,7 @@ pub enum Action {
     OpenTerminal,
     DeleteSelected,
     ChangeNetvm,    // open netvm picker for selected VM
+    ChangeLabel,    // open label picker for selected VM
     EditProperty,   // open edit modal for the highlighted property row
     EditChar(char), // printable character typed into the edit input
     EditBackspace,  // delete last char in edit input

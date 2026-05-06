@@ -82,6 +82,10 @@ pub fn render(frame: &mut Frame, app: &mut App, ui: &mut UiState) {
         } => {
             netvm_popup::render(frame, frame.area(), vm_name, candidates, selected);
         }
+        Modal::ChangeLabel { ref vm_name, selected } => {
+            let candidates: Vec<String> = crate::app::LABELS.iter().map(|s| s.to_string()).collect();
+            netvm_popup::render(frame, frame.area(), vm_name, &candidates, selected);
+        }
         Modal::None => {}
     }
 }

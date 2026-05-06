@@ -17,6 +17,8 @@ pub fn render_tabs(frame: &mut Frame, area: Rect, app: &App) {
         (ActiveView::ServiceManager, "[2] Services"),
         (ActiveView::TemplateManager, "[3] Templates"),
         (ActiveView::WhonixManager, "[4] Whonix"),
+        (ActiveView::DisposableManager, "[5] Disposables"),
+        (ActiveView::All, "[6] All"),
     ];
 
     for (view, label) in &tabs {

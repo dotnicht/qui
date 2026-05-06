@@ -31,6 +31,8 @@ fn translate_key(key: KeyEvent) -> Option<Action> {
         (Char('2'), _) => Some(Action::SwitchToServiceManager),
         (Char('3'), _) => Some(Action::SwitchToTemplateManager),
         (Char('4'), _) => Some(Action::SwitchToWhonixManager),
+        (Char('5'), _) => Some(Action::SwitchToDisposableManager),
+        (Char('6'), _) => Some(Action::SwitchToAll),
 
         // VM operations (only meaningful when no modal is open)
         (Char('s'), Mods::NONE) => Some(Action::StartSelected),
@@ -40,6 +42,7 @@ fn translate_key(key: KeyEvent) -> Option<Action> {
         (Char('t'), _) => Some(Action::OpenTerminal),
         (Char('d'), _) => Some(Action::DeleteSelected),
         (Char('n'), _) => Some(Action::ChangeNetvm),
+        (Char('c'), Mods::NONE) => Some(Action::ChangeLabel),
         (Char('e'), _) => Some(Action::EditProperty),
 
         // Confirmation dialogs

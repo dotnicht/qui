@@ -8,6 +8,8 @@ use crate::admin::{AdminClient, QubeClass, QubeInfo, QubeProperties, QubeState};
 
 use crate::action::{Action, OpKind, SideEffect};
 
+pub const LABELS: &[&str] = &["red", "orange", "yellow", "green", "gray", "blue", "purple", "black", "white"];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(clippy::enum_variant_names)]
 pub enum ActiveView {
@@ -15,6 +17,8 @@ pub enum ActiveView {
     ServiceManager,
     TemplateManager,
     WhonixManager,
+    DisposableManager,
+    All,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,6 +35,10 @@ pub enum Modal {
     ChangeNetvm {
         vm_name: String,
         candidates: Vec<String>, // "None" + names of network-providing VMs
+        selected: usize,
+    },
+    ChangeLabel {
+        vm_name: String,
         selected: usize,
     },
     EditProperty {
@@ -248,6 +256,46 @@ impl App {
                     _ => vec![],
                 };
             }
+            Modal::ChangeLabel { vm_name, selected } => {
+                let name = vm_name.clone();
+                let mut selected = *selected;
+                return match action {
+                    Action::MoveUp => {
+                        if selected > 0 {
+                            selected -= 1;
+                        }
+                        self.modal = Modal::ChangeLabel { vm_name: name, selected };
+                        vec![]
+                    }
+                    Action::MoveDown => {
+                        if selected + 1 < LABELS.len() {
+                            selected += 1;
+                        }
+                        self.modal = Modal::ChangeLabel { vm_name: name, selected };
+                        vec![]
+                    }
+                    Action::Confirm | Action::EditSubmit => {
+                        let value = LABELS[selected].to_string();
+                        self.modal = Modal::None;
+                        if let Some(q) = self.qubes.iter_mut().find(|q| q.name == name) {
+                            q.label = value.clone();
+                        }
+                        vec![SideEffect::SetProperty {
+                            vm: name,
+                            property: "label".into(),
+                            value,
+                        }]
+                    }
+                    Action::Cancel | Action::Quit => {
+                        if matches!(action, Action::Quit) {
+                            self.should_quit = true;
+                        }
+                        self.modal = Modal::None;
+                        vec![]
+                    }
+                    _ => vec![],
+                };
+            }
             Modal::EditProperty {
                 vm_name,
                 property,
@@ -391,6 +439,18 @@ impl App {
                 self.rebuild_filtered();
                 vec![]
             }
+            Action::SwitchToDisposableManager => {
+                self.active_view = ActiveView::DisposableManager;
+                self.selected_index = 0;
+                self.rebuild_filtered();
+                vec![]
+            }
+            Action::SwitchToAll => {
+                self.active_view = ActiveView::All;
+                self.selected_index = 0;
+                self.rebuild_filtered();
+                vec![]
+            }
 
             Action::StartSelected => {
                 if let Some(name) = self.selected_halted_name() {
@@ -460,15 +520,7 @@ impl App {
                     let mut candidates: Vec<String> = self
                         .qubes
                         .iter()
-                        .filter(|q| {
-                            q.state == QubeState::Running
-                                || self
-                                    .properties_cache
-                                    .get(&q.name)
-                                    .and_then(|p| p.provides_network)
-                                    .unwrap_or(false)
-                        })
-                        .filter(|q| q.name != vm_name)
+                        .filter(|q| q.name.starts_with("sys-") && q.name != vm_name)
                         .map(|q| q.name.clone())
                         .collect();
                     candidates.sort();
@@ -478,6 +530,16 @@ impl App {
                         .and_then(|c| candidates.iter().position(|n| n == c))
                         .unwrap_or(0);
                     self.modal = Modal::ChangeNetvm { vm_name, candidates, selected };
+                }
+                vec![]
+            }
+
+            Action::ChangeLabel => {
+                if let Some(q) = self.selected_qube() {
+                    let vm_name = q.name.clone();
+                    let current = q.label.clone();
+                    let selected = LABELS.iter().position(|&l| l == current).unwrap_or(0);
+                    self.modal = Modal::ChangeLabel { vm_name, selected };
                 }
                 vec![]
             }
@@ -543,15 +605,20 @@ impl App {
                 let name_lc = q.name.to_lowercase();
                 let keep = match self.active_view {
                     ActiveView::QubeManager => {
-                        !matches!(q.class, QubeClass::TemplateVM | QubeClass::AdminVM)
+                        !matches!(q.class, QubeClass::TemplateVM | QubeClass::AdminVM | QubeClass::DispVM)
                             && !q.name.starts_with("sys-")
                             && !name_lc.contains("whonix")
+                            && !name_lc.ends_with("-dvm")
                     }
                     ActiveView::ServiceManager => {
                         matches!(q.class, QubeClass::AdminVM) || q.name.starts_with("sys-")
                     }
                     ActiveView::TemplateManager => matches!(q.class, QubeClass::TemplateVM),
                     ActiveView::WhonixManager => name_lc.contains("whonix"),
+                    ActiveView::DisposableManager => {
+                        matches!(q.class, QubeClass::DispVM) || name_lc.ends_with("-dvm")
+                    }
+                    ActiveView::All => true,
                 };
                 if keep {
                     Some(i)
