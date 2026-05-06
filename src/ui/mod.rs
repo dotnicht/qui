@@ -3,13 +3,14 @@ mod help_popup;
 mod layout;
 mod netvm_popup;
 mod qube_table;
+mod stats_view;
 mod status_bar;
 
 use ratatui::style::Color;
 use ratatui::widgets::TableState;
 use ratatui::Frame;
 
-use crate::app::{App, Modal};
+use crate::app::{ActiveView, App, Modal};
 
 pub(super) fn label_color(label: &str) -> Color {
     match label {
@@ -51,8 +52,12 @@ pub fn render(frame: &mut Frame, app: &mut App, ui: &mut UiState) {
     // Tab bar
     status_bar::render_tabs(frame, areas.tab_bar, app);
 
-    // Main qube/template table (always rendered as background)
-    qube_table::render(frame, areas.main_table, app, &mut ui.table_state);
+    // Main table — stats view gets its own renderer
+    if app.active_view == ActiveView::StatsView {
+        stats_view::render(frame, areas.main_table, app, &mut ui.table_state);
+    } else {
+        qube_table::render(frame, areas.main_table, app, &mut ui.table_state);
+    }
 
     // Bottom key hints + status
     status_bar::render_bottom(frame, areas.key_hints, areas.status_bar, app);

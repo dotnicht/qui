@@ -33,6 +33,7 @@ fn translate_key(key: KeyEvent) -> Option<Action> {
         (Char('4'), _) => Some(Action::SwitchToWhonixManager),
         (Char('5'), _) => Some(Action::SwitchToDisposableManager),
         (Char('6'), _) => Some(Action::SwitchToAll),
+        (Char('7'), _) => Some(Action::SwitchToStatsView),
 
         // VM operations (only meaningful when no modal is open)
         (Char('s'), Mods::NONE) => Some(Action::StartSelected),

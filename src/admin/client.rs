@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use super::error::{AdminError, AdminResult};
 use super::protocol::{parse_properties, parse_vm_list, Request, Response};
-use super::types::{QubeInfo, QubeProperties};
+use super::types::{QubeInfo, QubeProperties, VmStats};
 
 const SOCKET_PATH: &str = "/var/run/qubes/qubesd.sock";
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -99,6 +99,22 @@ impl AdminClient {
     /// Set a single VM property.
     /// `property` is the API name (e.g. `"memory"`, `"netvm"`, `"label"`).
     /// `value` is the string representation accepted by qubesd.
+    pub fn get_stats(&self) -> AdminResult<Vec<(String, VmStats)>> {
+        match &self.mode {
+            AccessMode::Socket(p) => {
+                let req = Request {
+                    method: "admin.vm.stats",
+                    destination: "dom0",
+                    arg: "",
+                    payload: b"",
+                };
+                let resp = self.socket_call(p, &req)?;
+                Ok(parse_stats_socket(&resp.data))
+            }
+            AccessMode::Cli => cli_get_stats(),
+        }
+    }
+
     pub fn set_property(&self, vm: &str, property: &str, value: &str) -> AdminResult<()> {
         match &self.mode {
             AccessMode::Socket(p) => {
@@ -272,6 +288,52 @@ fn cli_get_properties(name: &str) -> AdminResult<QubeProperties> {
         }
     }
     Ok(props)
+}
+
+// ── stats parsers ─────────────────────────────────────────────────────────────
+
+// Socket response format (admin.vm.stats):
+//   vm_name\0cpu_time=N\0mem_used=N\0\0  (per VM, repeated)
+fn parse_stats_socket(data: &[u8]) -> Vec<(String, VmStats)> {
+    let mut out = Vec::new();
+    for chunk in data.split(|&b| b == 0).collect::<Vec<_>>().chunks(2) {
+        if chunk.len() < 2 { continue; }
+        let name = String::from_utf8_lossy(chunk[0]).to_string();
+        if name.is_empty() { continue; }
+        let mut cpu_pct = 0.0f32;
+        let mut mem_kb = 0u64;
+        for kv in String::from_utf8_lossy(chunk[1]).split_whitespace() {
+            if let Some(v) = kv.strip_prefix("cpu_usage=") {
+                cpu_pct = v.parse::<f32>().unwrap_or(0.0) / 10.0;
+            } else if let Some(v) = kv.strip_prefix("mem_used=") {
+                mem_kb = v.parse::<u64>().unwrap_or(0) / 1024;
+            }
+        }
+        out.push((name, VmStats { cpu_pct, mem_kb }));
+    }
+    out
+}
+
+// CLI fallback: parse `xl list` output
+// Format (header + one row per domain):
+//   Name  ID  Mem  VCPUs  State  Time(s)
+fn cli_get_stats() -> AdminResult<Vec<(String, VmStats)>> {
+    let out = Command::new("xl")
+        .args(["list"])
+        .output()
+        .map_err(AdminError::Io)?;
+
+    let text = std::str::from_utf8(&out.stdout).map_err(|e| AdminError::Parse(e.to_string()))?;
+    let mut result = Vec::new();
+
+    for line in text.lines().skip(1) {
+        let cols: Vec<&str> = line.split_whitespace().collect();
+        if cols.len() < 6 { continue; }
+        let name = cols[0].to_string();
+        let mem_kb = cols[2].parse::<u64>().unwrap_or(0) * 1024;
+        result.push((name, VmStats { cpu_pct: 0.0, mem_kb }));
+    }
+    Ok(result)
 }
 
 fn parse_bool_cli(s: &str) -> Option<bool> {

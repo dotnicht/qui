@@ -61,7 +61,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &mut TableState) 
         crate::app::ActiveView::TemplateManager => " Templates ",
         crate::app::ActiveView::WhonixManager => " Whonix ",
         crate::app::ActiveView::DisposableManager => " Disposables ",
-        crate::app::ActiveView::All => " All ",
+        crate::app::ActiveView::All | crate::app::ActiveView::StatsView => " All ",
     };
 
     let table = Table::new(

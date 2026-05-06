@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::admin::{AdminEvent, QubeInfo, QubeProperties};
+use crate::admin::{AdminEvent, QubeInfo, QubeProperties, VmStats};
 
 #[derive(Debug, Clone)]
 pub enum OpKind {
@@ -16,6 +16,7 @@ pub enum OpKind {
 #[derive(Debug)]
 pub enum SideEffect {
     FetchQubeList,
+    FetchStats,
     FetchProperties(String),
     StartVm(String),
     ShutdownVm(String),
@@ -46,6 +47,7 @@ pub enum Action {
     SwitchToWhonixManager,
     SwitchToDisposableManager,
     SwitchToAll,
+    SwitchToStatsView,
     ShowHelp,
     HideHelp,
     ToggleDetail,
@@ -71,6 +73,7 @@ pub enum Action {
     // Async results from background threads
     QubeListLoaded(Vec<QubeInfo>),
     PropertiesLoaded { name: String, props: QubeProperties },
+    StatsLoaded(Vec<(String, VmStats)>),
     OperationCompleted { op_id: u64 },
     OperationFailed { op_id: u64, error: String },
     EventReceived(AdminEvent),

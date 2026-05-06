@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::admin::{AdminClient, QubeClass, QubeInfo, QubeProperties, QubeState};
+use crate::admin::{AdminClient, QubeClass, QubeInfo, QubeProperties, QubeState, VmStats};
 
 use crate::action::{Action, OpKind, SideEffect};
 
@@ -19,6 +19,7 @@ pub enum ActiveView {
     WhonixManager,
     DisposableManager,
     All,
+    StatsView,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,6 +90,7 @@ pub struct App {
     /// Rebuilt by the UI layer and stored here so App::update() can look up by index.
     pub detail_rows: Vec<(String, String)>,
     pub properties_cache: HashMap<String, QubeProperties>,
+    pub stats: HashMap<String, VmStats>,
     pub pending_ops: Vec<PendingOp>,
     pub next_op_id: u64,
     pub status: Option<StatusMessage>,
@@ -108,6 +110,7 @@ impl App {
             detail_row: 0,
             detail_rows: Vec::new(),
             properties_cache: HashMap::new(),
+            stats: HashMap::new(),
             pending_ops: Vec::new(),
             next_op_id: 0,
             status: None,
@@ -491,6 +494,12 @@ impl App {
                 self.rebuild_filtered();
                 vec![]
             }
+            Action::SwitchToStatsView => {
+                self.active_view = ActiveView::StatsView;
+                self.selected_index = 0;
+                self.rebuild_filtered();
+                vec![SideEffect::FetchStats]
+            }
 
             Action::StartSelected => {
                 if let Some(name) = self.selected_halted_name() {
@@ -645,6 +654,11 @@ impl App {
             // These are only meaningful inside modals handled above; ignore otherwise.
             Action::EditProperty | Action::EditChar(_) | Action::EditBackspace => vec![],
 
+            Action::StatsLoaded(entries) => {
+                self.stats = entries.into_iter().collect();
+                vec![]
+            }
+
             Action::Tick | Action::Confirm => vec![],
         }
     }
@@ -677,7 +691,7 @@ impl App {
                     ActiveView::DisposableManager => {
                         matches!(q.class, QubeClass::DispVM) || name_lc.ends_with("-dvm")
                     }
-                    ActiveView::All => true,
+                    ActiveView::All | ActiveView::StatsView => true,
                 };
                 if keep {
                     Some(i)

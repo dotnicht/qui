@@ -76,6 +76,12 @@ pub struct QubeInfo {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct VmStats {
+    pub cpu_pct: f32,
+    pub mem_kb: u64,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct QubeProperties {
     pub memory: Option<u64>,
     pub maxmem: Option<u64>,

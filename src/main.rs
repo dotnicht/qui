@@ -30,6 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     spawn_effect(SideEffect::FetchQubeList, client.clone(), tx.clone());
 
     let tick = Duration::from_millis(200);
+    let mut ticks: u32 = 0;
 
     loop {
         term.draw(|frame| ui::render(frame, &mut app, &mut ui))?;
@@ -41,6 +42,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     spawn_effect(eff, client.clone(), tx.clone());
                 }
             }
+        }
+
+        ticks = ticks.wrapping_add(1);
+        // Refresh stats every ~2s when on stats view
+        if ticks % 10 == 0 && app.active_view == crate::app::ActiveView::StatsView {
+            spawn_effect(SideEffect::FetchStats, client.clone(), tx.clone());
         }
 
         loop {
@@ -67,6 +74,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn spawn_effect(eff: SideEffect, client: Arc<AdminClient>, tx: mpsc::Sender<Action>) {
     std::thread::spawn(move || match eff {
+        SideEffect::FetchStats => {
+            if let Ok(entries) = client.get_stats() {
+                let _ = tx.send(Action::StatsLoaded(entries));
+            }
+        }
         SideEffect::FetchQubeList => match client.list_qubes() {
             Ok(qubes) => {
                 let _ = tx.send(Action::QubeListLoaded(qubes));

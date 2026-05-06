@@ -19,6 +19,7 @@ pub fn render_tabs(frame: &mut Frame, area: Rect, app: &App) {
         (ActiveView::WhonixManager, "[4] Whonix"),
         (ActiveView::DisposableManager, "[5] Disposables"),
         (ActiveView::All, "[6] All"),
+        (ActiveView::StatsView, "[7] Stats"),
     ];
 
     for (view, label) in &tabs {
