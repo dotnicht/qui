@@ -48,7 +48,7 @@ pub fn render_tabs(frame: &mut Frame, area: Rect, app: &App) {
 
 pub fn render_bottom(frame: &mut Frame, hints_area: Rect, status_area: Rect, app: &App) {
     // Key hints line
-    let hints_text = " [s]tart [S]shutdown [K]ill [p]ause [t]terminal [d]delete [n]etvm [Enter]detail";
+    let hints_text = " [s]tart [S]hutdown [K]ill [p]ause [t]erminal [d]elete [n]etvm [c]olor [T]emplate [Enter]detail";
     frame.render_widget(
         Paragraph::new(hints_text).style(Style::default().fg(Color::DarkGray)),
         hints_area,
