@@ -211,23 +211,15 @@ fn cli_list_qubes() -> AdminResult<Vec<QubeInfo>> {
             continue;
         }
         let cols: Vec<&str> = line.split('|').collect();
-        if cols.len() < 6 {
+        if cols.is_empty() {
             continue;
         }
         let name = cols[0].to_string();
-        let class = super::types::QubeClass::from_str(cols[1]);
-        let state = super::types::QubeState::from_str(cols[2]);
-        let label = cols[3].to_string();
-        let template = if cols[4].is_empty() || cols[4] == "-" {
-            None
-        } else {
-            Some(cols[4].to_string())
-        };
-        let netvm = if cols[5].is_empty() || cols[5] == "-" || cols[5] == "None" {
-            None
-        } else {
-            Some(cols[5].to_string())
-        };
+        let class = super::types::QubeClass::from_str(cols.get(1).copied().unwrap_or(""));
+        let state = super::types::QubeState::from_str(cols.get(2).copied().unwrap_or(""));
+        let label = cols.get(3).copied().unwrap_or("").to_string();
+        let template = cols.get(4).filter(|&&v| !v.is_empty() && v != "-").map(|v| v.to_string());
+        let netvm = cols.get(5).filter(|&&v| !v.is_empty() && v != "-" && v != "None").map(|v| v.to_string());
         qubes.push(QubeInfo {
             name,
             class,
