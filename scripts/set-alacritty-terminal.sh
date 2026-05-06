@@ -23,7 +23,7 @@ else
 fi
 
 update-desktop-database "$APPS_DIR" 2>/dev/null || true
-echo "[+] $(hostname) done"
+echo "[+] done"
 
 if ! command -v qvm-run >/dev/null 2>&1; then
     exit 0
