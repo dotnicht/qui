@@ -119,13 +119,18 @@ fn spawn_effect(eff: SideEffect, client: Arc<AdminClient>, tx: mpsc::Sender<Acti
             });
         }
         SideEffect::OpenTerminal(name) => {
+            // Start the VM first if it isn't running; qvm-run --auto handles this
             let _ = std::process::Command::new("qvm-run")
                 .args([
+                    "--auto",
                     "--service",
                     "--user=user",
                     &name,
                     "qubes.StartApp+qubes-run-terminal",
                 ])
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
                 .spawn();
         }
         SideEffect::SetProperty {

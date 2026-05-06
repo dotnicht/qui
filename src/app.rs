@@ -542,7 +542,7 @@ impl App {
                 vec![]
             }
             Action::OpenTerminal => {
-                if let Some(name) = self.selected_running_name() {
+                if let Some(name) = self.selected_qube().map(|q| q.name.clone()) {
                     vec![SideEffect::OpenTerminal(name)]
                 } else {
                     vec![]
