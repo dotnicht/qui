@@ -4,25 +4,33 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
-pub fn render(frame: &mut Frame, area: Rect, vm_name: &str, candidates: &[String], selected: usize) {
+pub fn render(
+    frame: &mut Frame,
+    area: Rect,
+    title: &str,
+    candidates: &[String],
+    selected: usize,
+    item_color: impl Fn(&str) -> Color,
+) {
     let height = (candidates.len() as u16 + 6).min(area.height.saturating_sub(4));
     let popup = centered_rect_abs(50, height, area);
     frame.render_widget(Clear, popup);
 
     let mut lines: Vec<Line> = vec![Line::raw("")];
     for (i, name) in candidates.iter().enumerate() {
+        let color = item_color(name);
         if i == selected {
             lines.push(Line::styled(
                 format!("  ▶ {name}"),
                 Style::default()
                     .fg(Color::Black)
-                    .bg(Color::Cyan)
+                    .bg(color)
                     .add_modifier(Modifier::BOLD),
             ));
         } else {
             lines.push(Line::from(vec![
                 Span::raw("    "),
-                Span::styled(name.clone(), Style::default().fg(Color::Cyan)),
+                Span::styled(name.clone(), Style::default().fg(color)),
             ]));
         }
     }
@@ -34,7 +42,7 @@ pub fn render(frame: &mut Frame, area: Rect, vm_name: &str, candidates: &[String
 
     let para = Paragraph::new(lines).block(
         Block::default()
-            .title(format!(" NetVM for {} ", vm_name))
+            .title(format!(" {title} "))
             .borders(Borders::ALL)
             .style(Style::default().fg(Color::Cyan)),
     );

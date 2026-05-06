@@ -41,6 +41,11 @@ pub enum Modal {
         vm_name: String,
         selected: usize,
     },
+    ChangeTemplate {
+        vm_name: String,
+        candidates: Vec<String>,
+        selected: usize,
+    },
     EditProperty {
         vm_name: String,
         property: String,
@@ -296,6 +301,41 @@ impl App {
                     _ => vec![],
                 };
             }
+            Modal::ChangeTemplate { vm_name, candidates, selected } => {
+                let name = vm_name.clone();
+                let candidates = candidates.clone();
+                let mut selected = *selected;
+                return match action {
+                    Action::MoveUp => {
+                        if selected > 0 { selected -= 1; }
+                        self.modal = Modal::ChangeTemplate { vm_name: name, candidates, selected };
+                        vec![]
+                    }
+                    Action::MoveDown => {
+                        if selected + 1 < candidates.len() { selected += 1; }
+                        self.modal = Modal::ChangeTemplate { vm_name: name, candidates, selected };
+                        vec![]
+                    }
+                    Action::Confirm | Action::EditSubmit => {
+                        let value = candidates[selected].clone();
+                        self.modal = Modal::None;
+                        self.properties_cache.remove(&name);
+                        if let Some(q) = self.qubes.iter_mut().find(|q| q.name == name) {
+                            q.template = Some(value.clone());
+                        }
+                        vec![
+                            SideEffect::SetProperty { vm: name.clone(), property: "template".into(), value },
+                            SideEffect::FetchProperties(name),
+                        ]
+                    }
+                    Action::Cancel | Action::Quit => {
+                        if matches!(action, Action::Quit) { self.should_quit = true; }
+                        self.modal = Modal::None;
+                        vec![]
+                    }
+                    _ => vec![],
+                };
+            }
             Modal::EditProperty {
                 vm_name,
                 property,
@@ -540,6 +580,25 @@ impl App {
                     let current = q.label.clone();
                     let selected = LABELS.iter().position(|&l| l == current).unwrap_or(0);
                     self.modal = Modal::ChangeLabel { vm_name, selected };
+                }
+                vec![]
+            }
+            Action::ChangeTemplate => {
+                if let Some(q) = self.selected_qube() {
+                    let vm_name = q.name.clone();
+                    let current = q.template.clone();
+                    let mut candidates: Vec<String> = self
+                        .qubes
+                        .iter()
+                        .filter(|q| matches!(q.class, QubeClass::TemplateVM))
+                        .map(|q| q.name.clone())
+                        .collect();
+                    candidates.sort();
+                    let selected = current
+                        .as_deref()
+                        .and_then(|c| candidates.iter().position(|n| n == c))
+                        .unwrap_or(0);
+                    self.modal = Modal::ChangeTemplate { vm_name, candidates, selected };
                 }
                 vec![]
             }

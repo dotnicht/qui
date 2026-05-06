@@ -5,10 +5,26 @@ mod netvm_popup;
 mod qube_table;
 mod status_bar;
 
+use ratatui::style::Color;
 use ratatui::widgets::TableState;
 use ratatui::Frame;
 
 use crate::app::{App, Modal};
+
+pub(super) fn label_color(label: &str) -> Color {
+    match label {
+        "red" => Color::Red,
+        "orange" => Color::Rgb(245, 121, 0),
+        "yellow" => Color::Yellow,
+        "green" => Color::Green,
+        "gray" | "grey" => Color::DarkGray,
+        "black" => Color::DarkGray,
+        "white" => Color::White,
+        "blue" => Color::Blue,
+        "purple" => Color::Magenta,
+        _ => Color::Cyan,
+    }
+}
 
 pub struct UiState {
     pub table_state: TableState,
@@ -80,11 +96,18 @@ pub fn render(frame: &mut Frame, app: &mut App, ui: &mut UiState) {
             ref candidates,
             selected,
         } => {
-            netvm_popup::render(frame, frame.area(), vm_name, candidates, selected);
+            netvm_popup::render(frame, frame.area(), &format!("NetVM for {vm_name}"), candidates, selected, |_| Color::Cyan);
         }
         Modal::ChangeLabel { ref vm_name, selected } => {
             let candidates: Vec<String> = crate::app::LABELS.iter().map(|s| s.to_string()).collect();
-            netvm_popup::render(frame, frame.area(), vm_name, &candidates, selected);
+            netvm_popup::render(frame, frame.area(), &format!("Label for {vm_name}"), &candidates, selected, label_color);
+        }
+        Modal::ChangeTemplate {
+            ref vm_name,
+            ref candidates,
+            selected,
+        } => {
+            netvm_popup::render(frame, frame.area(), &format!("Template for {vm_name}"), candidates, selected, |_| Color::Cyan);
         }
         Modal::None => {}
     }

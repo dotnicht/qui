@@ -84,18 +84,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &mut TableState) 
 }
 
 fn label_to_color(label: &str) -> Color {
-    match label {
-        "red" => Color::Red,
-        "orange" => Color::Rgb(245, 121, 0),
-        "yellow" => Color::Yellow,
-        "green" => Color::Green,
-        "gray" | "grey" => Color::DarkGray,
-        "black" => Color::DarkGray, // black would be invisible on dark terminals
-        "white" => Color::White,
-        "blue" => Color::Blue,
-        "purple" => Color::Magenta,
-        _ => Color::Reset,
-    }
+    super::label_color(label)
 }
 
 // Cheap single-frame spinner — advances each render based on system time mod 4

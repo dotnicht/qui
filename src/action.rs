@@ -60,8 +60,9 @@ pub enum Action {
     PauseSelected,
     OpenTerminal,
     DeleteSelected,
-    ChangeNetvm,    // open netvm picker for selected VM
-    ChangeLabel,    // open label picker for selected VM
+    ChangeNetvm,      // open netvm picker for selected VM
+    ChangeLabel,      // open label picker for selected VM
+    ChangeTemplate,   // open template picker for selected VM
     EditProperty,   // open edit modal for the highlighted property row
     EditChar(char), // printable character typed into the edit input
     EditBackspace,  // delete last char in edit input

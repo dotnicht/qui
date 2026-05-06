@@ -43,6 +43,7 @@ fn translate_key(key: KeyEvent) -> Option<Action> {
         (Char('d'), _) => Some(Action::DeleteSelected),
         (Char('n'), _) => Some(Action::ChangeNetvm),
         (Char('c'), Mods::NONE) => Some(Action::ChangeLabel),
+        (Char('T'), _) => Some(Action::ChangeTemplate),
         (Char('e'), _) => Some(Action::EditProperty),
 
         // Confirmation dialogs
