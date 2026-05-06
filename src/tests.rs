@@ -1,7 +1,7 @@
 use crate::action::{Action, SideEffect};
 use crate::admin::types::{QubeClass, QubeInfo, QubeState};
 use crate::admin::{AdminClient, QubeProperties};
-use crate::app::{ActiveView, App};
+use crate::app::{ActiveView, App, Modal, LABELS};
 use std::sync::Arc;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -308,6 +308,103 @@ fn all_four_tabs_partition_correctly() {
     assert!(whx.contains(&"anon-whonix".to_string()));
     assert!(whx.contains(&"sys-whonix".to_string()));
     assert_eq!(whx.len(), 2);
+}
+
+// ── All tab ───────────────────────────────────────────────────────────────────
+
+#[test]
+fn all_tab_shows_every_vm() {
+    let mut app = make_app();
+    load(
+        &mut app,
+        vec![
+            appvm("personal"),
+            sysvm("sys-net"),
+            adminvm("dom0"),
+            templatevm("fedora-41"),
+            appvm("anon-whonix"),
+            qube("disp42", QubeClass::DispVM, QubeState::Running),
+        ],
+    );
+    app.update(Action::SwitchToAll);
+    assert_eq!(names(&app).len(), 6);
+}
+
+// ── Label picker ──────────────────────────────────────────────────────────────
+
+#[test]
+fn change_label_opens_picker_for_selected() {
+    let mut app = make_app();
+    load(&mut app, vec![appvm("personal")]);
+    app.update(Action::ChangeLabel);
+    assert!(matches!(app.modal, Modal::ChangeLabel { .. }));
+}
+
+#[test]
+fn change_label_navigates_and_confirms() {
+    let mut app = make_app();
+    load(&mut app, vec![appvm("personal")]);
+    app.update(Action::ChangeLabel);
+    app.update(Action::MoveDown); // move to index 1
+    let effects = app.update(Action::EditSubmit);
+    assert!(matches!(app.modal, Modal::None));
+    assert!(effects.iter().any(|e| matches!(e, SideEffect::SetProperty { property, .. } if property == "label")));
+    assert_eq!(app.qubes[0].label, LABELS[1]);
+}
+
+#[test]
+fn change_label_cancel_closes_picker() {
+    let mut app = make_app();
+    load(&mut app, vec![appvm("personal")]);
+    app.update(Action::ChangeLabel);
+    app.update(Action::Cancel);
+    assert!(matches!(app.modal, Modal::None));
+}
+
+#[test]
+fn change_label_preselects_current_label() {
+    let mut app = make_app();
+    // appvm helper sets label = "red", which is LABELS[0]
+    load(&mut app, vec![appvm("personal")]);
+    app.update(Action::ChangeLabel);
+    if let Modal::ChangeLabel { selected, .. } = app.modal {
+        assert_eq!(LABELS[selected], "red");
+    } else {
+        panic!("expected ChangeLabel modal");
+    }
+}
+
+// ── NetVM picker ──────────────────────────────────────────────────────────────
+
+#[test]
+fn change_netvm_opens_picker_with_sys_vms_only() {
+    let mut app = make_app();
+    load(
+        &mut app,
+        vec![appvm("personal"), sysvm("sys-net"), sysvm("sys-firewall"), adminvm("dom0")],
+    );
+    app.update(Action::ChangeNetvm);
+    if let Modal::ChangeNetvm { candidates, .. } = &app.modal {
+        assert!(candidates.contains(&"sys-net".to_string()));
+        assert!(candidates.contains(&"sys-firewall".to_string()));
+        assert!(candidates.contains(&"None".to_string()));
+        assert!(!candidates.contains(&"dom0".to_string()));
+        assert!(!candidates.contains(&"personal".to_string()));
+    } else {
+        panic!("expected ChangeNetvm modal");
+    }
+}
+
+#[test]
+fn change_netvm_confirm_updates_local_state() {
+    let mut app = make_app();
+    load(&mut app, vec![appvm("personal"), sysvm("sys-net")]);
+    app.update(Action::ChangeNetvm);
+    // Select "None" (index 0)
+    let effects = app.update(Action::EditSubmit);
+    assert!(matches!(app.modal, Modal::None));
+    assert!(effects.iter().any(|e| matches!(e, SideEffect::SetProperty { property, .. } if property == "netvm")));
+    assert!(app.qubes[0].netvm.is_none());
 }
 
 // ── Properties cache interaction ──────────────────────────────────────────────

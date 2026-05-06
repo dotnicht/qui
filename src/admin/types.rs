@@ -86,3 +86,51 @@ pub struct QubeProperties {
     pub default_dispvm: Option<String>,
     pub raw: HashMap<String, String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn qubeclass_roundtrip() {
+        let cases = [
+            ("AppVM", QubeClass::AppVM, "AppVM"),
+            ("TemplateVM", QubeClass::TemplateVM, "TmplVM"),
+            ("StandaloneVM", QubeClass::StandaloneVM, "StndVM"),
+            ("DispVM", QubeClass::DispVM, "DispVM"),
+            ("AdminVM", QubeClass::AdminVM, "Admin"),
+        ];
+        for (input, expected, label) in cases {
+            let c = QubeClass::from_str(input);
+            assert_eq!(c, expected);
+            assert_eq!(c.short_label(), label);
+        }
+    }
+
+    #[test]
+    fn qubeclass_unknown() {
+        let c = QubeClass::from_str("FutureVM");
+        assert_eq!(c.short_label(), "FutureVM");
+    }
+
+    #[test]
+    fn qubestate_roundtrip() {
+        let cases = [
+            ("Running", QubeState::Running, "RUN"),
+            ("Halted", QubeState::Halted, "OFF"),
+            ("Paused", QubeState::Paused, "PAU"),
+            ("Transient", QubeState::Transient, "..."),
+        ];
+        for (input, expected, label) in cases {
+            let s = QubeState::from_str(input);
+            assert_eq!(s, expected);
+            assert_eq!(s.short_label(), label);
+        }
+    }
+
+    #[test]
+    fn qubestate_unknown() {
+        let s = QubeState::from_str("Crashed");
+        assert_eq!(s.short_label(), "???");
+    }
+}

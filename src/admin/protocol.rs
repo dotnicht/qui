@@ -191,3 +191,159 @@ fn parse_bool(s: &str) -> Option<bool> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Request::encode ───────────────────────────────────────────────────────
+
+    #[test]
+    fn encode_joins_fields_with_nul() {
+        let r = Request { method: "admin.vm.List", destination: "dom0", arg: "", payload: b"" };
+        let enc = r.encode();
+        assert_eq!(enc, b"admin.vm.List\x00dom0\x00\x00");
+    }
+
+    #[test]
+    fn encode_includes_payload() {
+        let r = Request { method: "m", destination: "d", arg: "a", payload: b"data" };
+        let enc = r.encode();
+        assert!(enc.ends_with(b"data"));
+    }
+
+    // ── Response::decode ──────────────────────────────────────────────────────
+
+    #[test]
+    fn decode_ok_response() {
+        let raw = b"\x30\x00hello";
+        let resp = Response::decode(raw).unwrap();
+        assert_eq!(resp.data, b"hello");
+    }
+
+    #[test]
+    fn decode_event_response() {
+        let raw = b"\x31\x00payload";
+        let resp = Response::decode(raw).unwrap();
+        assert_eq!(resp.data, b"payload");
+    }
+
+    #[test]
+    fn decode_exception_returns_err() {
+        let raw = b"\x32\x00QubesException\x00traceback\x00something went wrong";
+        let err = Response::decode(raw).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("QubesException"));
+        assert!(msg.contains("something went wrong"));
+    }
+
+    #[test]
+    fn decode_too_short_returns_err() {
+        let err = Response::decode(b"\x30").unwrap_err();
+        assert!(err.to_string().contains("too short"));
+    }
+
+    #[test]
+    fn decode_unknown_type_byte_returns_err() {
+        let raw = b"\xff\x00data";
+        let err = Response::decode(raw).unwrap_err();
+        assert!(err.to_string().contains("unknown response type"));
+    }
+
+    // ── parse_vm_list ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_typical_vm_list() {
+        let data = b"personal class=AppVM state=Running label=red template=fedora-41 netvm=sys-firewall\n\
+                     dom0 class=AdminVM state=Running label=black\n\
+                     fedora-41 class=TemplateVM state=Halted label=black\n";
+        let qubes = parse_vm_list(data).unwrap();
+        assert_eq!(qubes.len(), 3);
+
+        let personal = &qubes[0];
+        assert_eq!(personal.name, "personal");
+        assert_eq!(personal.class, QubeClass::AppVM);
+        assert_eq!(personal.state, QubeState::Running);
+        assert_eq!(personal.label, "red");
+        assert_eq!(personal.template.as_deref(), Some("fedora-41"));
+        assert_eq!(personal.netvm.as_deref(), Some("sys-firewall"));
+
+        let dom0 = &qubes[1];
+        assert_eq!(dom0.class, QubeClass::AdminVM);
+        assert!(dom0.netvm.is_none());
+    }
+
+    #[test]
+    fn parse_vm_list_netvm_none_becomes_option_none() {
+        let data = b"vault class=AppVM state=Halted label=black netvm=None\n";
+        let qubes = parse_vm_list(data).unwrap();
+        assert!(qubes[0].netvm.is_none());
+    }
+
+    #[test]
+    fn parse_vm_list_skips_blank_lines() {
+        let data = b"\npersonal class=AppVM state=Halted label=red\n\n";
+        let qubes = parse_vm_list(data).unwrap();
+        assert_eq!(qubes.len(), 1);
+    }
+
+    #[test]
+    fn parse_vm_list_invalid_utf8_returns_err() {
+        let data = b"\xff\xfe";
+        assert!(parse_vm_list(data).is_err());
+    }
+
+    // ── parse_properties ─────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_properties_numeric_and_bool() {
+        let data = b"memory default=no type=int value=4000\n\
+                     maxmem default=no type=int value=8000\n\
+                     vcpus default=no type=int value=2\n\
+                     autostart default=no type=bool value=False\n\
+                     provides_network default=no type=bool value=True\n\
+                     kernel default=no type=str value=5.15.0\n\
+                     default_dispvm default=no type=str value=fedora-dvm\n";
+        let props = parse_properties(data).unwrap();
+        assert_eq!(props.memory, Some(4000));
+        assert_eq!(props.maxmem, Some(8000));
+        assert_eq!(props.vcpus, Some(2));
+        assert_eq!(props.autostart, Some(false));
+        assert_eq!(props.provides_network, Some(true));
+        assert_eq!(props.kernel.as_deref(), Some("5.15.0"));
+        assert_eq!(props.default_dispvm.as_deref(), Some("fedora-dvm"));
+    }
+
+    #[test]
+    fn parse_bool_all_truthy_variants() {
+        for v in ["True", "true", "1", "yes"] {
+            let data = format!("autostart default=no type=bool value={v}\n");
+            let props = parse_properties(data.as_bytes()).unwrap();
+            assert_eq!(props.autostart, Some(true), "expected true for value={v}");
+        }
+    }
+
+    #[test]
+    fn parse_bool_all_falsy_variants() {
+        for v in ["False", "false", "0", "no"] {
+            let data = format!("autostart default=no type=bool value={v}\n");
+            let props = parse_properties(data.as_bytes()).unwrap();
+            assert_eq!(props.autostart, Some(false), "expected false for value={v}");
+        }
+    }
+
+    #[test]
+    fn parse_properties_skips_lines_without_value() {
+        let data = b"memory default=yes type=int\n";
+        let props = parse_properties(data).unwrap();
+        assert!(props.memory.is_none());
+        assert!(props.raw.is_empty());
+    }
+
+    #[test]
+    fn parse_properties_raw_map_populated() {
+        let data = b"memory default=no type=int value=2048\n";
+        let props = parse_properties(data).unwrap();
+        assert_eq!(props.raw.get("memory").map(|s| s.as_str()), Some("2048"));
+    }
+}

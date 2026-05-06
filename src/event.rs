@@ -55,3 +55,80 @@ fn translate_key(key: KeyEvent) -> Option<Action> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    fn key(code: KeyCode, mods: KeyModifiers) -> Event {
+        Event::Key(KeyEvent::new(code, mods))
+    }
+
+    fn press(code: KeyCode) -> Option<Action> {
+        translate(key(code, KeyModifiers::NONE))
+    }
+
+    #[test]
+    fn quit_and_ctrl_c() {
+        assert!(matches!(press(KeyCode::Char('q')), Some(Action::Quit)));
+        assert!(matches!(
+            translate(key(KeyCode::Char('c'), KeyModifiers::CONTROL)),
+            Some(Action::Quit)
+        ));
+    }
+
+    #[test]
+    fn navigation_keys() {
+        assert!(matches!(press(KeyCode::Char('j')), Some(Action::MoveDown)));
+        assert!(matches!(press(KeyCode::Down), Some(Action::MoveDown)));
+        assert!(matches!(press(KeyCode::Char('k')), Some(Action::MoveUp)));
+        assert!(matches!(press(KeyCode::Up), Some(Action::MoveUp)));
+        assert!(matches!(press(KeyCode::Char('g')), Some(Action::MoveTop)));
+        assert!(matches!(press(KeyCode::Home), Some(Action::MoveTop)));
+        assert!(matches!(press(KeyCode::Char('G')), Some(Action::MoveBottom)));
+        assert!(matches!(press(KeyCode::End), Some(Action::MoveBottom)));
+    }
+
+    #[test]
+    fn tab_switching_keys() {
+        assert!(matches!(press(KeyCode::Char('1')), Some(Action::SwitchToQubeManager)));
+        assert!(matches!(press(KeyCode::Char('2')), Some(Action::SwitchToServiceManager)));
+        assert!(matches!(press(KeyCode::Char('3')), Some(Action::SwitchToTemplateManager)));
+        assert!(matches!(press(KeyCode::Char('4')), Some(Action::SwitchToWhonixManager)));
+        assert!(matches!(press(KeyCode::Char('5')), Some(Action::SwitchToDisposableManager)));
+        assert!(matches!(press(KeyCode::Char('6')), Some(Action::SwitchToAll)));
+    }
+
+    #[test]
+    fn vm_operation_keys() {
+        assert!(matches!(press(KeyCode::Char('s')), Some(Action::StartSelected)));
+        assert!(matches!(press(KeyCode::Char('S')), Some(Action::ShutdownSelected)));
+        assert!(matches!(press(KeyCode::Char('K')), Some(Action::KillSelected)));
+        assert!(matches!(press(KeyCode::Char('p')), Some(Action::PauseSelected)));
+        assert!(matches!(press(KeyCode::Char('t')), Some(Action::OpenTerminal)));
+        assert!(matches!(press(KeyCode::Char('d')), Some(Action::DeleteSelected)));
+        assert!(matches!(press(KeyCode::Char('n')), Some(Action::ChangeNetvm)));
+        assert!(matches!(press(KeyCode::Char('c')), Some(Action::ChangeLabel)));
+        assert!(matches!(press(KeyCode::Char('e')), Some(Action::EditProperty)));
+    }
+
+    #[test]
+    fn misc_keys() {
+        assert!(matches!(press(KeyCode::Esc), Some(Action::Cancel)));
+        assert!(matches!(press(KeyCode::Enter), Some(Action::EditSubmit)));
+        assert!(matches!(press(KeyCode::Char('?')), Some(Action::ShowHelp)));
+        assert!(matches!(press(KeyCode::Char('y')), Some(Action::Confirm)));
+        assert!(matches!(press(KeyCode::Backspace), Some(Action::EditBackspace)));
+    }
+
+    #[test]
+    fn printable_char_becomes_edit_char() {
+        assert!(matches!(press(KeyCode::Char('x')), Some(Action::EditChar('x'))));
+    }
+
+    #[test]
+    fn non_key_event_returns_none() {
+        assert!(translate(Event::Resize(80, 24)).is_none());
+    }
+}
